@@ -1,16 +1,17 @@
 // ============================================================================
-// COMPONENTE: VISTA DE CATÁLOGO Y CARRITO DE CLIENTE (CORREGIDO)
+// COMPONENTE: VISTA DE CATÁLOGO Y CARRITO DE CLIENTE
 // Ubicación: components/catalogo/CatalogoCliente.tsx
+// BD: v3.0 — usa ProductoEntity y CategoriaEntity
 // ============================================================================
 
 'use client';
 
 import React, { useState } from 'react';
-import { ProductoEstructurado, Categoria } from '../../models/agrolactec';
+import { ProductoEntity, CategoriaEntity } from '../../models/agrolactec';
 
 interface Props {
-  productos: ProductoEstructurado[];
-  categorias: Categoria[];
+  productos: ProductoEntity[];
+  categorias: CategoriaEntity[];
 }
 
 export default function CatalogoCliente({ productos, categorias }: Props) {
@@ -18,26 +19,37 @@ export default function CatalogoCliente({ productos, categorias }: Props) {
   const [categoriaSel, setCategoriaSel] = useState<string>('');
 
   // --------------------------------------------------------------------------
-  // FILTRADO DINÁMICO EN MEMORIA (PROTEGIDO CONTRA NULL / UNDEFINED)
+  // FILTRADO DINÁMICO
   // --------------------------------------------------------------------------
   const productosFiltrados = productos.filter((p) => {
-    // CORRECCIÓN: Se obtiene el nombre desde nombre_producto o nombre con fallback seguro
-    const nombreProd = (p.nombre_producto || (p as any).nombre || '').toLowerCase();
+    const nombreProd = (p.nombre || '').toLowerCase();
     const itemCode = (p.item_code || '').toLowerCase();
     const textoBusqueda = busqueda.toLowerCase().trim();
 
-    const coincideNombre = nombreProd.includes(textoBusqueda) || itemCode.includes(textoBusqueda);
-    const coincideCategoria = categoriaSel === '' || p.id_categoria === categoriaSel;
+    const coincideNombre =
+      nombreProd.includes(textoBusqueda) || itemCode.includes(textoBusqueda);
+
+    const coincideCategoria =
+      categoriaSel === '' || p.id_categoria === categoriaSel;
 
     return coincideNombre && coincideCategoria;
   });
 
   return (
     <div>
-      <h2 style={{ color: '#1e293b', marginBottom: '15px' }}>🛍️ Catálogo de Productos</h2>
+      <h2 style={{ color: '#1e293b', marginBottom: '15px' }}>
+        🛍️ Catálogo de Productos
+      </h2>
 
-      {/* CONTROLES DE FILTRADO Y BÚSQUEDA */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+      {/* CONTROLES DE FILTRADO */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '10px',
+          marginBottom: '20px',
+          flexWrap: 'wrap',
+        }}
+      >
         <input
           type="text"
           placeholder="🔍 Buscar por nombre o código de ítem..."
@@ -65,16 +77,18 @@ export default function CatalogoCliente({ productos, categorias }: Props) {
           <option value="">Todas las Categorías</option>
           {categorias.map((cat) => (
             <option key={cat.id_categoria} value={cat.id_categoria}>
-              {cat.nombre_categoria}
+              {cat.nombre}
             </option>
           ))}
         </select>
       </div>
 
-      {/* REJILLA DE TARJETAS DE PRODUCTO */}
+      {/* REJILLA DE TARJETAS */}
       {productosFiltrados.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-          <p style={{ fontSize: '1.1rem' }}>📦 No se encontraron productos en el catálogo.</p>
+          <p style={{ fontSize: '1.1rem' }}>
+            📦 No se encontraron productos en el catálogo.
+          </p>
         </div>
       ) : (
         <div
@@ -111,11 +125,29 @@ export default function CatalogoCliente({ productos, categorias }: Props) {
                 >
                   {prod.item_code}
                 </span>
-                <h3 style={{ margin: '8px 0 4px 0', fontSize: '1.05rem', color: '#0f172a' }}>
-                  {prod.nombre_producto || (prod as any).nombre || 'Producto sin nombre'}
+
+                <h3
+                  style={{
+                    margin: '8px 0 4px 0',
+                    fontSize: '1.05rem',
+                    color: '#0f172a',
+                  }}
+                >
+                  {prod.nombre || 'Producto sin nombre'}
                 </h3>
-                <p style={{ margin: '0 0 10px 0', fontSize: '0.8rem', color: '#64748b' }}>
-                  {prod.categoria?.nombre_categoria || 'Categoría Lácteos'}
+
+                {/* Categoría + Subcategoría */}
+                <p
+                  style={{
+                    margin: '0 0 10px 0',
+                    fontSize: '0.8rem',
+                    color: '#64748b',
+                  }}
+                >
+                  {prod.categorias?.nombre || 'Sin categoría'}
+                  {prod.subcategorias?.nombre && (
+                    <> · {prod.subcategorias.nombre}</>
+                  )}
                 </p>
               </div>
 
@@ -130,20 +162,32 @@ export default function CatalogoCliente({ productos, categorias }: Props) {
                 }}
               >
                 <div>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      color: '#64748b',
+                      display: 'block',
+                    }}
+                  >
                     Precio Detalle:
                   </span>
                   <strong style={{ fontSize: '1.1rem', color: '#16a34a' }}>
-                    ${Number(prod.precio_detalle || 0).toFixed(2)}
+                    ${Number(prod.precio_b2c || 0).toFixed(2)}
                   </strong>
                 </div>
 
                 <div>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      color: '#64748b',
+                      display: 'block',
+                    }}
+                  >
                     Mayoreo (Caja):
                   </span>
                   <strong style={{ fontSize: '0.95rem', color: '#0284c7' }}>
-                    ${Number(prod.precio_mayoreo || 0).toFixed(2)}
+                    ${Number(prod.precio_b2b || 0).toFixed(2)}
                   </strong>
                 </div>
               </div>

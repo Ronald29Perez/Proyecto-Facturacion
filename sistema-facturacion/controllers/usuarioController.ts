@@ -1,19 +1,25 @@
 // ============================================================================
 // CONTROLADOR DE GESTIÓN DE USUARIOS
 // Ubicación: controllers/usuarioController.ts
+// BD: v3.0 — tabla 'usuarios' con columna 'rol' (texto)
 // ============================================================================
 
 import { supabase } from '../lib/supabase';
-import { Usuario } from '../models/agrolactec';
+import { Usuario, RolUsuario } from '../models/agrolactec';
 
-/**
- * Obtiene la lista completa de usuarios registrados en el ERP
- */
+const ROLES_VALIDOS: RolUsuario[] = [
+  'ADMINISTRADOR', 'GERENTE', 'BODEGA', 'CAJERO', 'VENDEDOR', 'CLIENTE',
+];
+
+// ============================================================================
+// 1. LISTAR USUARIOS
+// ============================================================================
+
 export async function obtenerUsuarios(): Promise<Usuario[]> {
   try {
     const { data, error } = await supabase
       .from('usuarios')
-      .select('*')
+      .select('id_usuario, nombre_completo, username, rol, activo, created_at')
       .order('nombre_completo', { ascending: true });
 
     if (error) {
@@ -21,18 +27,7 @@ export async function obtenerUsuarios(): Promise<Usuario[]> {
       return [];
     }
 
-    return (data || []).map((usr: any) => ({
-      id_usuario: usr.id_usuario,
-      nombre_completo: usr.nombre_completo,
-      username: usr.username,
-      id_rol: usr.rol,
-      activo: usr.activo,
-      rol: {
-        id_rol: usr.rol,
-        nombre_rol: usr.rol,
-        descripcion: `Rol de ${usr.rol}`,
-      },
-    }));
+    return (data || []) as Usuario[];
   } catch (err) {
     console.error('Error de servidor en obtenerUsuarios:', err);
     return [];
@@ -40,8 +35,31 @@ export async function obtenerUsuarios(): Promise<Usuario[]> {
 }
 
 /**
- * Registra un nuevo usuario cifrando su contraseña con bcrypt en PostgreSQL
+ * Obtener usuarios filtrados por rol
  */
+export async function obtenerUsuariosPorRol(rol: RolUsuario): Promise<Usuario[]> {
+  try {
+    const { data, error } = await supabase
+      .from('usuarios')
+      .select('id_usuario, nombre_completo, username, rol, activo')
+      .eq('rol', rol)
+      .eq('activo', true);
+
+    if (error) {
+      console.error('Error al obtener usuarios por rol:', error.message);
+      return [];
+    }
+    return (data || []) as Usuario[];
+  } catch (err) {
+    console.error(err);
+    return [];
+  }
+}
+
+// ============================================================================
+// 2. CREAR USUARIO
+// ============================================================================
+
 export async function crearUsuario(datos: {
   nombre_completo: string;
   username: string;
@@ -49,22 +67,40 @@ export async function crearUsuario(datos: {
   rol_nombre: string;
 }): Promise<{ success: boolean; message: string }> {
   try {
-    // Normalizar el rol a mayúsculas para mantener consistencia
-    const rolFormateado = (datos.rol_nombre || 'CLIENTE').toUpperCase().trim();
+    // Validar rol
+    const rolFormateado = (datos.rol_nombre || 'CLIENTE').toUpperCase().trim() as RolUsuario;
+    if (!ROLES_VALIDOS.includes(rolFormateado)) {
+      return { 
+        success: false, 
+        message: `❌ Rol inválido. Debe ser uno de: ${ROLES_VALIDOS.join(', ')}` 
+      };
+    }
 
+    // Validar que username no exista ya
+    const { data: existente } = await supabase
+      .from('usuarios')
+      .select('id_usuario')
+      .eq('username', datos.username.toLowerCase().trim())
+      .maybeSingle();
+
+    if (existente) {
+      return { success: false, message: '❌ El username ya está registrado.' };
+    }
+
+    // ⚠️ SEGURIDAD: en producción usa bcrypt aquí.
+    // Por ahora se guarda en password_hash tal cual (placeholder para dev).
     const { error } = await supabase.from('usuarios').insert([
       {
-        id_usuario: crypto.randomUUID(),
         nombre_completo: datos.nombre_completo,
         username: datos.username.toLowerCase().trim(),
-        password: datos.password,
+        password_hash: datos.password,   // 🔥 antes era 'password', ahora 'password_hash'
         rol: rolFormateado,
         activo: true,
       },
     ]);
 
     if (error) {
-      console.error('Error al insertar usuario en Supabase:', error.message);
+      console.error('Error al insertar usuario:', error.message);
       return { success: false, message: `Error al crear usuario: ${error.message}` };
     }
 
@@ -74,9 +110,11 @@ export async function crearUsuario(datos: {
     return { success: false, message: `Error en el servidor: ${err.message}` };
   }
 }
-/**
- * Activa o desactiva la cuenta de un usuario
- */
+
+// ============================================================================
+// 3. ACTUALIZAR / ESTADO
+// ============================================================================
+
 export async function cambiarEstadoUsuario(
   id_usuario: string,
   nuevoEstado: boolean
@@ -93,9 +131,59 @@ export async function cambiarEstadoUsuario(
 
     return {
       success: true,
-      message: `✅ Estado del usuario actualizado a ${nuevoEstado ? 'Activo' : 'Inactivo'}.`,
+      message: `✅ Usuario ${nuevoEstado ? 'activado' : 'desactivado'} correctamente.`,
     };
   } catch (err) {
     return { success: false, message: 'Error al cambiar el estado del usuario.' };
+  }
+}
+
+/**
+ * Actualiza datos de un usuario existente
+ */
+export async function actualizarUsuario(
+  id_usuario: string,
+  cambios: Partial<Omit<Usuario, 'id_usuario' | 'password_hash'>>
+): Promise<{ success: boolean; message: string }> {
+  try {
+    delete (cambios as any).id_usuario;
+    delete (cambios as any).password_hash;
+
+    const { error } = await supabase
+      .from('usuarios')
+      .update(cambios)
+      .eq('id_usuario', id_usuario);
+
+    if (error) throw error;
+
+    return { success: true, message: '✅ Usuario actualizado correctamente.' };
+  } catch (err: any) {
+    console.error('Error al actualizar usuario:', err.message);
+    return { success: false, message: `Error: ${err.message}` };
+  }
+}
+
+/**
+ * Cambiar la contraseña de un usuario
+ */
+export async function cambiarPassword(
+  id_usuario: string,
+  nuevaPassword: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    if (!nuevaPassword || nuevaPassword.length < 4) {
+      return { success: false, message: '❌ La contraseña debe tener al menos 4 caracteres.' };
+    }
+
+    const { error } = await supabase
+      .from('usuarios')
+      .update({ password_hash: nuevaPassword })  // ⚠️ usar bcrypt en prod
+      .eq('id_usuario', id_usuario);
+
+    if (error) throw error;
+
+    return { success: true, message: '✅ Contraseña actualizada correctamente.' };
+  } catch (err: any) {
+    return { success: false, message: `Error: ${err.message}` };
   }
 }
