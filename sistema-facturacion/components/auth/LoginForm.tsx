@@ -1,13 +1,14 @@
 // ============================================================================
 // COMPONENTE: FORMULARIO DE LOGIN
 // Ubicación: components/auth/LoginForm.tsx
-// Flujo: hace login → llama a onLoginExitoso → el padre decide qué mostrar
 // ============================================================================
 
 'use client';
 
 import { useState } from 'react';
 import { iniciarSesion, SesionUsuario } from '../../controllers/authController';
+import Image from 'next/image';
+import { Lock, Loader2 } from 'lucide-react';
 
 interface Props {
   onLoginExitoso: (usuario: SesionUsuario) => void | Promise<void>;
@@ -27,7 +28,6 @@ export default function LoginForm({ onLoginExitoso }: Props) {
     const resultado = await iniciarSesion(username, password);
 
     if (resultado.success && resultado.usuario) {
-      // El padre (app/page.tsx) se encarga de guardar y navegar
       await onLoginExitoso(resultado.usuario);
     } else {
       setError(resultado.message);
@@ -64,22 +64,16 @@ export default function LoginForm({ onLoginExitoso }: Props) {
       >
         {/* LOGO / TÍTULO */}
         <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-          <h1
-            style={{
-              margin: 0,
-              fontSize: '1.8rem',
-              color: '#0284c7',
-            }}
-          >
-            🧀 AgroLactec
-          </h1>
-          <p
-            style={{
-              margin: '4px 0 0 0',
-              fontSize: '0.85rem',
-              color: '#64748b',
-            }}
-          >
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
+            <Image 
+              src="/img/logo-agrolactec.png" 
+              alt="AgroLactec Logo" 
+              width={220} 
+              height={80} 
+              style={{ objectFit: 'contain' }} 
+            />
+          </div>
+          <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
             Sistema de Pedidos e Inventario
           </p>
         </div>
@@ -142,26 +136,25 @@ export default function LoginForm({ onLoginExitoso }: Props) {
             fontSize: '1rem',
             cursor: cargando ? 'not-allowed' : 'pointer',
             marginTop: '8px',
+            display: 'flex',           // 🔥 Alinea el icono y el texto
+            alignItems: 'center',      // 🔥 Alinea el icono y el texto
+            justifyContent: 'center',  // 🔥 Centra todo
+            gap: '8px',                // 🔥 Espacio entre el icono y el texto
+            transition: 'background-color 0.2s'
           }}
         >
-          {cargando ? 'Ingresando...' : '🔐 Iniciar Sesión'}
+          {cargando ? (
+            <>
+              <Loader2 size={20} className="animate-spin" /> {/* Icono de carga girando */}
+              Ingresando...
+            </>
+          ) : (
+            <>
+              <Lock size={20} />
+              Iniciar Sesión
+            </>
+          )}
         </button>
-
-        {/* PISTA DE USUARIOS DE PRUEBA */}
-        <div
-          style={{
-            marginTop: '16px',
-            paddingTop: '16px',
-            borderTop: '1px solid #e2e8f0',
-            fontSize: '0.75rem',
-            color: '#94a3b8',
-            textAlign: 'center',
-          }}
-        >
-          <strong>Usuarios de prueba:</strong>
-          <br />
-          admin / admin123 · bodega1 / bod123 · cliente_test / cli123
-        </div>
       </form>
     </div>
   );

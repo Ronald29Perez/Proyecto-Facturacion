@@ -1,7 +1,7 @@
 // ============================================================================
 // CONTROLADOR DE BODEGA, LOTES Y DESPACHO FIFO
 // Ubicación: controllers/despachoController.ts
-// BD: v3.0 — usa la función RPC procesar_despacho_fifo
+// BD: v3.1 — conversión automática de Cajas a Unidades Base
 // ============================================================================
 
 import { supabase } from '../lib/supabase';
@@ -21,12 +21,13 @@ export async function obtenerLotesOrdenadosFIFO(): Promise<LoteEntity[]> {
           id_producto,
           item_code,
           nombre,
+          unidad_medida,
           unidades_por_caja,
           precio_b2c,
           precio_b2b
         )
       `)
-      .gt('cantidad_disponible', 0)  // 🔥 cambio: antes era unidades_disponibles
+      .gt('cantidad_disponible', 0)
       .order('fecha_vencimiento', { ascending: true });
 
     if (error) {
@@ -34,9 +35,7 @@ export async function obtenerLotesOrdenadosFIFO(): Promise<LoteEntity[]> {
       return [];
     }
 
-    // Mapeamos al modelo LoteEntity + estado calculado
     const lotesFormateados: LoteEntity[] = (data || []).map((item: any) => {
-      // Calcular estado de vencimiento dinámicamente
       const hoy = new Date();
       const vence = new Date(item.fecha_vencimiento);
       const diasRestantes = Math.ceil((vence.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
@@ -66,22 +65,44 @@ export async function obtenerLotesOrdenadosFIFO(): Promise<LoteEntity[]> {
 }
 
 /**
- * 2. Registra una nueva entrada de lote a bodega
+ * 2. Registra una nueva entrada de lote a bodega.
+ * 🔥 Si el producto NO se vende por caja (ej. se vende por unidad),
+ *    convierte las "cajas físicas" ingresadas a "unidades base" para el inventario.
  */
 export async function registrarNuevoLote(nuevoLote: {
   id_producto: string;
   codigo_lote: string;
   fecha_vencimiento: string;
-  cantidad_disponible: number;   // 🔥 cambio: antes era cajas_ingresadas
+  cantidad_ingresada: number;  // 🔥 Cajas físicas que el bodeguero recibió
 }): Promise<{ success: boolean; message: string }> {
   try {
+    // 1. Obtener producto para saber cómo se vende y su factor
+    const { data: prod, error: errProd } = await supabase
+      .from('productos')
+      .select('unidad_medida, unidades_por_caja')
+      .eq('id_producto', nuevoLote.id_producto)
+      .single();
+
+    if (errProd || !prod) {
+      return { success: false, message: 'Producto no encontrado.' };
+    }
+
+    // 2. Calcular el stock en "unidad base"
+    // Si el producto se vende por caja -> cantidad = cajas
+    // Si se vende por unidad/libra -> cantidad = cajas * factor
+    let cantidadFinal = nuevoLote.cantidad_ingresada;
+
+    if (prod.unidad_medida !== 'CAJA') {
+      cantidadFinal = nuevoLote.cantidad_ingresada * (prod.unidades_por_caja || 1);
+    }
+
+    // 3. Guardar en Supabase
     const { error } = await supabase.from('lotes').insert([
       {
         id_producto: nuevoLote.id_producto,
         codigo_lote: nuevoLote.codigo_lote,
         fecha_vencimiento: nuevoLote.fecha_vencimiento,
-        cantidad_disponible: nuevoLote.cantidad_disponible,
-        // fecha_ingreso se pone por default CURRENT_DATE en la BD
+        cantidad_disponible: cantidadFinal,
       },
     ]);
 
@@ -90,7 +111,14 @@ export async function registrarNuevoLote(nuevoLote: {
       return { success: false, message: `Error en la base de datos: ${error.message}` };
     }
 
-    return { success: true, message: '✅ Lote de inventario registrado con éxito.' };
+    const mensajeConv = prod.unidad_medida !== 'CAJA'
+      ? ` (${nuevoLote.cantidad_ingresada} cajas × ${prod.unidades_por_caja} ${prod.unidad_medida.toLowerCase()}s)`
+      : '';
+
+    return {
+      success: true,
+      message: `✅ Lote registrado. ${cantidadFinal} unidades base en inventario${mensajeConv}.`,
+    };
   } catch (err) {
     console.error('Error de servidor en registrarNuevoLote:', err);
     return { success: false, message: 'Error inesperado al registrar el lote.' };
@@ -110,13 +138,11 @@ export async function procesarDespachoCotizacionFIFO(
   idCotizacion: string
 ): Promise<{ success: boolean; message: string; id_orden?: string }> {
   try {
-    // Llamada a la función PostgreSQL (todo transaccional, sin sobreventa)
     const { data, error } = await supabase.rpc('procesar_despacho_fifo', {
       p_cotizacion_id: idCotizacion,
     });
 
     if (error) {
-      // Aquí caen los RAISE EXCEPTION del SQL (ej: "Stock insuficiente")
       return { success: false, message: error.message };
     }
 

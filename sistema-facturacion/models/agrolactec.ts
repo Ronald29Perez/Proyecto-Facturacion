@@ -1,5 +1,5 @@
 // ============================================================================
-// CONTRATOS DE DATOS E INTERFACES TYPESCRIPT (ERP AGROLACTEC v3.0)
+// CONTRATOS DE DATOS E INTERFACES TYPESCRIPT (ERP AGROLACTEC v3.1)
 // Ubicación: models/agrolactec.ts
 // Alineado con la BD v3.0 de Supabase
 // ============================================================================
@@ -20,7 +20,7 @@ export interface Usuario {
   id_usuario: string;
   nombre_completo: string;
   username: string;
-  password_hash: string;      //  Solo backend
+  password_hash: string;      // Solo backend
   rol: RolUsuario;
   activo: boolean;
   created_at?: string;
@@ -53,7 +53,6 @@ export interface ClienteEntity {
   created_at?: string;
 }
 
-// Alias para compatibilidad
 export type ClienteB2BEntity = ClienteEntity;
 export type ClienteB2CEntity = ClienteEntity;
 
@@ -110,11 +109,23 @@ export interface ProductoEntity {
   // Datos técnicos
   nso?: string;
   descripcion?: string;
+  
+  /** 
+   * 🔥 Unidad de venta al detalle (B2C). 
+   * Ej: 'UNIDAD' (Chorizo), 'CAJA' (Crema), 'LIBRA' (Queso).
+   */
   unidad_medida: UnidadMedida;
   
   // Precios
   precio_b2c: number;
   precio_b2b: number;
+  
+  /** 
+   * 🔥 Factor de conversión. 
+   * Cuántas "unidades_medida" trae una caja para la venta B2B.
+   * Ej: Si es Chorizo por UNIDAD, y la caja trae 15, aquí va 15.
+   * Si el producto se vende por CAJA, aquí va 1.
+   */
   unidades_por_caja: number;
   
   // Imagen
@@ -130,7 +141,6 @@ export interface ProductoEntity {
   proveedores?: ProveedorEntity;
 }
 
-// Alias para compatibilidad con código existente
 export type ProductoEstructurado = ProductoEntity;
 export type ProductoCatalogo = ProductoEntity;
 
@@ -144,7 +154,15 @@ export interface LoteEntity {
   codigo_lote: string;
   fecha_ingreso: string;
   fecha_vencimiento: string;
-  cantidad_disponible: number;   // Cambiado: antes era cajas_disponibles
+  
+  /** 
+   * 🔥 REGLA DE ORO: Este número SIEMPRE está en la unidad de venta más pequeña.
+   * - Si el producto es CAJA -> Aquí hay cajas.
+   * - Si el producto es UNIDAD -> Aquí hay unidades totales (cajas * unidades_por_caja).
+   * El motor FIFO descuenta directo de aquí.
+   */
+  cantidad_disponible: number; 
+  
   created_at?: string;
   
   // Relaciones
@@ -203,7 +221,7 @@ export interface CotizacionEntity {
   // Cliente
   cliente_tipo: ClienteTipo;
   cliente_nombre: string;
-  id_cliente?: string;        // Cambiado: era id_cliente_b2b
+  id_cliente?: string;
   
   // Vendedor
   id_vendedor?: string;
@@ -216,7 +234,9 @@ export interface CotizacionEntity {
   
   // Estado
   estado: EstadoCotizacion;
-  datos_entrega?: string;
+  
+  /** JSON con { telefono, direccion, notas } del checkout */
+  datos_entrega?: string; 
   
   // Relaciones
   cotizacion_detalles?: CotizacionDetalleEntity[];
@@ -234,7 +254,7 @@ export interface DespachoLoteDetalleEntity {
   id_despacho_detalle: string;
   id_orden: string;
   id_lote: string;
-  cantidad_descontada: number;   //  Antes era cajas_descontadas + unidades_descontadas
+  cantidad_descontada: number; 
   fecha_registro: string;
   
   // Relaciones

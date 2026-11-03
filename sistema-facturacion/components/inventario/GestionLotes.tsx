@@ -1,7 +1,7 @@
 // ============================================================================
 // COMPONENTE: GESTIÓN DE LOTES Y ENTRADAS A BODEGA
 // Ubicación: components/inventario/GestionLotes.tsx
-// BD: v3.0 — solo existe 'cantidad_disponible'
+// BD: v3.1 — conversión automática de Cajas Físicas a Unidades Base
 // ============================================================================
 
 'use client';
@@ -16,7 +16,7 @@ interface Props {
     id_producto: string;
     codigo_lote: string;
     fecha_vencimiento: string;
-    cantidad_disponible: number;  // 🔥 Cambiado
+    cantidad_ingresada: number;  // 🔥 Lo que el bodeguero escribe en cajas
   }) => Promise<void>;
 }
 
@@ -49,7 +49,7 @@ export default function GestionLotes({ productos, lotes, onGuardarLote }: Props)
   const [idProducto, setIdProducto] = useState('');
   const [codigoLote, setCodigoLote] = useState('');
   const [fechaVencimiento, setFechaVencimiento] = useState('');
-  const [cantidadDisponible, setCantidadDisponible] = useState<number>(1);
+  const [cajasFisicas, setCajasFisicas] = useState<number>(1);
   const [guardando, setGuardando] = useState(false);
 
   const productoSeleccionado = productos.find((p) => p.id_producto === idProducto);
@@ -67,33 +67,36 @@ export default function GestionLotes({ productos, lotes, onGuardarLote }: Props)
     setCodigoLote(generarCodigoLoteAuto(itemCode));
   };
 
-  // Resumen: cuántas unidades totales hay si se vende por caja
-  const unidadesCalculadas = productoSeleccionado
-    ? cantidadDisponible * (productoSeleccionado.unidades_por_caja || 1)
-    : 0;
+  // 🔥 Cálculo dinámico para mostrar en pantalla cuántas unidades se guardarán
+  const esVentaPorCaja = productoSeleccionado?.unidad_medida === 'CAJA';
+  const factorConversion = esVentaPorCaja ? 1 : (productoSeleccionado?.unidades_por_caja || 1);
+  const unidadesCalculadas = cajasFisicas * factorConversion;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!idProducto || !codigoLote || !fechaVencimiento || cantidadDisponible <= 0) {
+    if (!idProducto || !codigoLote || !fechaVencimiento || cajasFisicas <= 0) {
       alert('Por favor completa todos los campos del lote.');
       return;
     }
 
     setGuardando(true);
+    
+    // Enviamos "cantidad_ingresada". El controlador hará la magia de convertirla.
     await onGuardarLote({
       id_producto: idProducto,
       codigo_lote: codigoLote,
       fecha_vencimiento: fechaVencimiento,
-      cantidad_disponible: Number(cantidadDisponible),
+      cantidad_ingresada: Number(cajasFisicas),
     });
+    
     setGuardando(false);
 
     // Limpiar formulario
     setIdProducto('');
     setCodigoLote('');
     setFechaVencimiento('');
-    setCantidadDisponible(1);
+    setCajasFisicas(1);
   };
 
   return (
@@ -202,16 +205,16 @@ export default function GestionLotes({ productos, lotes, onGuardarLote }: Props)
             />
           </div>
 
-          {/* Cantidad */}
+          {/* Cantidad de Cajas Físicas */}
           <div>
             <label style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>
-              Cantidad de Cajas Ingresadas *:
+              Cajas Físicas Recibidas del Proveedor *:
             </label>
             <input
               type="number"
               min="1"
-              value={cantidadDisponible}
-              onChange={(e) => setCantidadDisponible(Number(e.target.value))}
+              value={cajasFisicas}
+              onChange={(e) => setCajasFisicas(Number(e.target.value))}
               style={{
                 width: '100%',
                 padding: '8px',
@@ -222,20 +225,30 @@ export default function GestionLotes({ productos, lotes, onGuardarLote }: Props)
             />
           </div>
 
-          {/* Resumen en unidades */}
+          {/* Resumen de conversión */}
           {productoSeleccionado && (
             <div
               style={{
                 padding: '10px',
-                backgroundColor: '#f0fdf4',
+                backgroundColor: esVentaPorCaja ? '#eff6ff' : '#f0fdf4',
                 borderRadius: '6px',
-                border: '1px solid #bbf7d0',
+                border: `1px solid ${esVentaPorCaja ? '#bfdbfe' : '#bbf7d0'}`,
                 fontSize: '0.85rem',
+                color: esVentaPorCaja ? '#1e3a8a' : '#166534',
               }}
             >
-              💡 <strong>Total en Unidades:</strong> {unidadesCalculadas} unidades
-              físicas ({cantidadDisponible} cajas ×{' '}
-              {productoSeleccionado.unidades_por_caja} und/caja).
+              {esVentaPorCaja ? (
+                <>
+                  📦 Este producto se vende por <strong>Caja</strong>. Se registrarán{' '}
+                  <strong>{cajasFisicas} cajas</strong> en el inventario.
+                </>
+              ) : (
+                <>
+                  💡 <strong>Conversión automática:</strong> {cajasFisicas} cajas ×{' '}
+                  {factorConversion} {productoSeleccionado.unidad_medida.toLowerCase()}(s)/caja ={' '}
+                  <strong>{unidadesCalculadas} unidades</strong> en inventario.
+                </>
+              )}
             </div>
           )}
 
@@ -296,7 +309,7 @@ export default function GestionLotes({ productos, lotes, onGuardarLote }: Props)
                   <th style={{ padding: '8px' }}>Lote</th>
                   <th style={{ padding: '8px' }}>Producto</th>
                   <th style={{ padding: '8px' }}>Vencimiento</th>
-                  <th style={{ padding: '8px' }}>Cajas Disponibles</th>
+                  <th style={{ padding: '8px' }}>Stock Disponible</th>
                   <th style={{ padding: '8px' }}>Estado</th>
                 </tr>
               </thead>
@@ -325,12 +338,14 @@ export default function GestionLotes({ productos, lotes, onGuardarLote }: Props)
                       <td
                         style={{
                           padding: '8px',
-                          textAlign: 'center',
                           color: '#16a34a',
                           fontWeight: 'bold',
                         }}
                       >
-                        {lote.cantidad_disponible}
+                        {lote.cantidad_disponible}{' '}
+                        <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: '#64748b' }}>
+                          {lote.productos?.unidad_medida?.toLowerCase() || 'unidad'}(s)
+                        </span>
                       </td>
                       <td style={{ padding: '8px' }}>
                         <span

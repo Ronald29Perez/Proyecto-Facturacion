@@ -1,13 +1,14 @@
 // ============================================================================
 // COMPONENTE: VISTA DE CATÁLOGO Y CARRITO DE CLIENTE
 // Ubicación: components/catalogo/CatalogoCliente.tsx
-// BD: v3.0 — usa ProductoEntity y CategoriaEntity
+// BD: v3.1 — Iconos profesionales y fotos de productos
 // ============================================================================
 
 'use client';
 
 import React, { useState } from 'react';
 import { ProductoEntity, CategoriaEntity } from '../../models/agrolactec';
+import { ShoppingBag, Search, PackageX } from 'lucide-react';
 
 interface Props {
   productos: ProductoEntity[];
@@ -37,8 +38,9 @@ export default function CatalogoCliente({ productos, categorias }: Props) {
 
   return (
     <div>
-      <h2 style={{ color: '#1e293b', marginBottom: '15px' }}>
-        🛍️ Catálogo de Productos
+      <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#1e293b', marginBottom: '20px' }}>
+        <ShoppingBag size={24} color="#0284c7" />
+        Catálogo de Productos
       </h2>
 
       {/* CONTROLES DE FILTRADO */}
@@ -50,19 +52,21 @@ export default function CatalogoCliente({ productos, categorias }: Props) {
           flexWrap: 'wrap',
         }}
       >
-        <input
-          type="text"
-          placeholder="🔍 Buscar por nombre o código de ítem..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          style={{
-            flex: 1,
-            padding: '10px',
-            borderRadius: '6px',
-            border: '1px solid #cbd5e1',
-            minWidth: '220px',
-          }}
-        />
+        <div style={{ flex: 1, position: 'relative', minWidth: '220px' }}>
+          <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+          <input
+            type="text"
+            placeholder="Buscar por nombre o código de ítem..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px 10px 10px 35px', // Espacio extra a la izquierda para el icono
+              borderRadius: '6px',
+              border: '1px solid #cbd5e1',
+            }}
+          />
+        </div>
 
         <select
           value={categoriaSel}
@@ -85,9 +89,10 @@ export default function CatalogoCliente({ productos, categorias }: Props) {
 
       {/* REJILLA DE TARJETAS */}
       {productosFiltrados.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-          <p style={{ fontSize: '1.1rem' }}>
-            📦 No se encontraron productos en el catálogo.
+        <div style={{ textAlign: 'center', padding: '40px', color: '#64748b', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+          <PackageX size={48} color="#cbd5e1" />
+          <p style={{ fontSize: '1.1rem', margin: 0 }}>
+            No se encontraron productos en el catálogo.
           </p>
         </div>
       ) : (
@@ -113,6 +118,15 @@ export default function CatalogoCliente({ productos, categorias }: Props) {
               }}
             >
               <div>
+                {/* 🔥 FOTO DEL PRODUCTO */}
+                <div style={{ height: '140px', backgroundColor: '#f8fafc', borderRadius: '6px', marginBottom: '12px', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  {prod.imagen_url ? (
+                    <img src={prod.imagen_url} alt={prod.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <ShoppingBag size={32} color="#cbd5e1" /> // Icono por defecto si no hay foto
+                  )}
+                </div>
+
                 <span
                   style={{
                     fontSize: '0.75rem',
@@ -126,24 +140,11 @@ export default function CatalogoCliente({ productos, categorias }: Props) {
                   {prod.item_code}
                 </span>
 
-                <h3
-                  style={{
-                    margin: '8px 0 4px 0',
-                    fontSize: '1.05rem',
-                    color: '#0f172a',
-                  }}
-                >
+                <h3 style={{ margin: '8px 0 4px 0', fontSize: '1.05rem', color: '#0f172a' }}>
                   {prod.nombre || 'Producto sin nombre'}
                 </h3>
 
-                {/* Categoría + Subcategoría */}
-                <p
-                  style={{
-                    margin: '0 0 10px 0',
-                    fontSize: '0.8rem',
-                    color: '#64748b',
-                  }}
-                >
+                <p style={{ margin: '0 0 10px 0', fontSize: '0.8rem', color: '#64748b' }}>
                   {prod.categorias?.nombre || 'Sin categoría'}
                   {prod.subcategorias?.nombre && (
                     <> · {prod.subcategorias.nombre}</>
@@ -162,13 +163,7 @@ export default function CatalogoCliente({ productos, categorias }: Props) {
                 }}
               >
                 <div>
-                  <span
-                    style={{
-                      fontSize: '0.75rem',
-                      color: '#64748b',
-                      display: 'block',
-                    }}
-                  >
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>
                     Precio Detalle:
                   </span>
                   <strong style={{ fontSize: '1.1rem', color: '#16a34a' }}>
@@ -177,13 +172,7 @@ export default function CatalogoCliente({ productos, categorias }: Props) {
                 </div>
 
                 <div>
-                  <span
-                    style={{
-                      fontSize: '0.75rem',
-                      color: '#64748b',
-                      display: 'block',
-                    }}
-                  >
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>
                     Mayoreo (Caja):
                   </span>
                   <strong style={{ fontSize: '0.95rem', color: '#0284c7' }}>

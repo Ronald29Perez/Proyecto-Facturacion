@@ -1,20 +1,22 @@
 // ============================================================================
 // CONTROLADOR DE COTIZACIONES Y RECEPCIÓN DESDE EL CARRITO LOCAL
 // Ubicación: controllers/cotizacionController.ts
-// BD: v3.0 (clientes unificados)
+// BD: v3.1 — incluye datos de entrega (teléfono y dirección)
 // ============================================================================
 
 import { supabase } from '../lib/supabase';
 import { ResumenCarrito, CotizacionEntity } from '../models/agrolactec';
 
 /**
- * Guarda en Supabase la cotización confirmada desde la memoria local del carrito
+ * Guarda en Supabase la cotización confirmada desde la memoria local del carrito.
+ * Incluye los datos de entrega (teléfono/dirección) en el campo `datos_entrega`.
  */
 export async function crearCotizacionDesdeCarrito(
   carrito: ResumenCarrito,
   clienteNombre: string,
   clienteTipo: 'B2B_COMERCIO' | 'B2C_HOGAR',
-  idCliente?: string // 🔗 Cambiado: antes era idClienteB2B
+  idCliente?: string,
+  datosEntrega?: string // 🔥 NUEVO: JSON con teléfono y dirección
 ): Promise<{ success: boolean; message: string; numero_cotizacion?: string }> {
   try {
     if (carrito.items.length === 0) {
@@ -31,11 +33,12 @@ export async function crearCotizacionDesdeCarrito(
           numero_cotizacion: numeroCotizacion,
           cliente_tipo: clienteTipo,
           cliente_nombre: clienteNombre,
-          id_cliente: idCliente || null, // 🔗 Cambiado: antes era id_cliente_b2b
+          id_cliente: idCliente || null,
           subtotal: carrito.subtotal,
           impuesto_iva: carrito.impuesto_iva,
           total: carrito.total,
           estado: 'PENDIENTE',
+          datos_entrega: datosEntrega || null, // 🔥 GUARDAMOS EL JSON AQUÍ
         },
       ])
       .select()
@@ -49,7 +52,7 @@ export async function crearCotizacionDesdeCarrito(
     const detallesData = carrito.items.map((item) => ({
       id_cotizacion: cotizacionCreada.id_cotizacion,
       id_producto: item.producto.id_producto,
-      nombre_producto: item.producto.nombre, // item.producto.nombre viene del modelo nuevo
+      nombre_producto: item.producto.nombre,
       unidad_medida: item.unidad_medida,
       cantidad: item.cantidad,
       precio_unitario: item.precio_unitario,
@@ -73,8 +76,8 @@ export async function crearCotizacionDesdeCarrito(
 }
 
 /**
- * Obtiene todas las cotizaciones pendientes de despachar por Bodega
- * Incluye datos del cliente (para mostrar NIT/NRC cuando sea B2B)
+ * Obtiene todas las cotizaciones pendientes de despachar por Bodega.
+ * Incluye datos del cliente y el JSON de entrega.
  */
 export async function obtenerCotizacionesPendientes(): Promise<CotizacionEntity[]> {
   try {
@@ -96,7 +99,6 @@ export async function obtenerCotizacionesPendientes(): Promise<CotizacionEntity[
     return (data || []).map((c: any) => ({
       ...c,
       detalles: c.cotizacion_detalles || [],
-      // adjuntamos el cliente al objeto para facilidad en el frontend
       clientes: c.clientes || null,
     }));
   } catch (err) {
