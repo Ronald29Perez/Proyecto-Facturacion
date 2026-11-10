@@ -1,7 +1,7 @@
 // ============================================================================
 // COMPONENTE: GESTIÓN DE ÓRDENES DE DESPACHO Y MOTOR FIFO
 // Ubicación: components/despacho/OrdenDespacho.tsx
-// BD: v3.4 — Impresión limpia con react-to-print
+// BD: v3.5 — Incluye estado de Pago y Diseño de Impresión
 // ============================================================================
 
 'use client';
@@ -10,7 +10,7 @@ import React, { useState, useRef } from 'react';
 import Image from 'next/image';
 import { useReactToPrint } from 'react-to-print';
 import { 
-  Inbox, Package, Zap, Printer, CheckCircle2, FileText, MousePointerClick, Box 
+  Inbox, Package, Zap, Printer, CheckCircle2, FileText, MousePointerClick, Box, CreditCard, Clock
 } from 'lucide-react';
 import { CotizacionEntity } from '../../models/agrolactec';
 import { obtenerPickingList } from '../../controllers/despachoController';
@@ -77,7 +77,6 @@ export default function OrdenDespacho({
       if (respuesta.id_orden) {
         const lista = await obtenerPickingList(respuesta.id_orden);
         setPickingList(lista as unknown as PickingItem[]);
-        // Ya NO hay window.print() automático aquí.
       }
     }
   };
@@ -107,8 +106,7 @@ export default function OrdenDespacho({
           Cotizaciones Recibidas ({cotizacionesPendientes.length})
         </h3>
         <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '15px' }}>
-          Selecciona una cotización recibida desde el carrito para ejecutar el
-          despacho FIFO.
+          Selecciona una cotización recibida para ejecutar el despacho FIFO.
         </p>
 
         {cotizacionesPendientes.length === 0 ? (
@@ -161,11 +159,25 @@ export default function OrdenDespacho({
                     ${Number(cot.total).toFixed(2)}
                   </span>
                 </div>
-                <div
-                  style={{ fontSize: '0.8rem', color: '#475569', marginTop: '4px' }}
-                >
-                  Cliente: <strong>{cot.cliente_nombre}</strong> ({cot.cliente_tipo})
+                
+                {/* 🔥 CLIENTE Y ETIQUETA DE PAGO */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#475569' }}>
+                    Cliente: <strong>{cot.cliente_nombre}</strong>
+                  </div>
+                  <span style={{ 
+                    fontSize: '0.65rem', 
+                    padding: '2px 6px', 
+                    borderRadius: '4px', 
+                    fontWeight: 'bold',
+                    display: 'flex', alignItems: 'center', gap: '3px',
+                    backgroundColor: cot.estado === 'PAGADO' ? '#dcfce7' : '#fef3c7',
+                    color: cot.estado === 'PAGADO' ? '#15803d' : '#b45309'
+                  }}>
+                    {cot.estado === 'PAGADO' ? <><CreditCard size={12}/> Pagado</> : <><Clock size={12}/> Pendiente</>}
+                  </span>
                 </div>
+
                 <div
                   style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}
                 >
@@ -209,6 +221,9 @@ export default function OrdenDespacho({
               </div>
               <div>
                 Tipo: <strong>{cotizacionSeleccionada.cliente_tipo}</strong>
+              </div>
+              <div style={{ marginTop: '5px' }}>
+                Estado de Pago: <strong style={{ color: cotizacionSeleccionada.estado === 'PAGADO' ? '#16a34a' : '#f59e0b' }}>{cotizacionSeleccionada.estado}</strong>
               </div>
             </div>
 
@@ -342,7 +357,6 @@ export default function OrdenDespacho({
         {/* ================================================================== */}
         {pickingList.length > 0 && (
           <>
-            {/* 🔥 REFERENCIA AQUI */}
             <div 
               ref={pickingListRef}
               style={{
@@ -378,7 +392,7 @@ export default function OrdenDespacho({
                 </div>
               </div>
 
-              {/* DATOS DE ENTREGA (Caja Amarilla) */}
+              {/* DATOS DE ENTREGA */}
               <div style={{ display: 'flex', gap: '40px', marginBottom: '30px', backgroundColor: '#fef3c7', padding: '15px', borderRadius: '6px', border: '1px solid #fcd34d' }}>
                 <div>
                   <p style={{ margin: 0, fontWeight: 'bold', color: '#92400e', fontSize: '0.85rem' }}>CLIENTE:</p>
@@ -438,7 +452,7 @@ export default function OrdenDespacho({
               </div>
             </div>
 
-            {/* 🔥 BOTÓN DE IMPRESIÓN (Fuera de la ref) */}
+            {/* BOTÓN DE IMPRESIÓN */}
             <button 
               onClick={() => handlePrint()} 
               style={{

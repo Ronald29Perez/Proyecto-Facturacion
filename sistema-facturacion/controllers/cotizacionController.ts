@@ -88,7 +88,8 @@ export async function obtenerCotizacionesPendientes(): Promise<CotizacionEntity[
         cotizacion_detalles (*),
         clientes (nombre, nit, nrc, telefono, razon_social)
       `)
-      .eq('estado', 'PENDIENTE')
+      // 🔥 AQUÍ EL CAMBIO: Ahora trae PENDIENTES y PAGADAS
+      .in('estado', ['PENDIENTE', 'PAGADO'])
       .order('fecha_emision', { ascending: false });
 
     if (error) {

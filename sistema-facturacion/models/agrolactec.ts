@@ -206,6 +206,7 @@ export type EstadoCotizacion =
   | 'PENDIENTE' 
   | 'APROBADO_DESPACHO' 
   | 'FACTURADO' 
+  | 'PAGADO' 
   | 'CANCELADO';
 
 export type CanalOrigen = 
@@ -248,7 +249,7 @@ export interface CotizacionEntity {
 // 7. MÓDULO DE ÓRDENES DE DESPACHO
 // ----------------------------------------------------------------------------
 
-export type EstadoOrdenDespacho = 'PENDIENTE' | 'PROCESADO' | 'FACTURADO';
+export type EstadoOrdenDespacho = 'PENDIENTE' | 'PROCESADO' | 'FACTURADO' ;
 
 export interface DespachoLoteDetalleEntity {
   id_despacho_detalle: string;

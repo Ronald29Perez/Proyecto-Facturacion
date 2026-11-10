@@ -222,3 +222,40 @@ export async function obtenerPickingList(idOrden: string) {
     return [];
   }
 }
+
+export async function ajustarStockLote(
+  id_lote: string, 
+  cantidad_real: number, 
+  motivo: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    // 1. Obtener la cantidad actual en el sistema
+    const { data: lote, error: errGet } = await supabase
+      .from('lotes')
+      .select('cantidad_disponible, codigo_lote')
+      .eq('id_lote', id_lote)
+      .single();
+
+    if (errGet || !lote) throw new Error('Lote no encontrado');
+
+    const diferencia = cantidad_real - lote.cantidad_disponible;
+
+    // 2. Actualizar el stock en la BD
+    const { error: errUpdate } = await supabase
+      .from('lotes')
+      .update({ cantidad_disponible: cantidad_real })
+      .eq('id_lote', id_lote);
+
+    if (errUpdate) throw errUpdate;
+
+    // 3. Registrar el ajuste (opcional: podrías crear una tabla de auditoría para esto)
+    console.log(`Ajuste en lote ${lote.codigo_lote}: ${diferencia} cajas. Motivo: ${motivo}`);
+
+    return { 
+      success: true, 
+      message: `✅ Lote ${lote.codigo_lote} ajustado. Diferencia: ${diferencia} cajas.` 
+    };
+  } catch (err: any) {
+    return { success: false, message: `❌ Error: ${err.message}` };
+  }
+}

@@ -1,7 +1,7 @@
 // ============================================================================
 // PÁGINA PRINCIPAL / DASHBOARD CENTRAL - ERP AGROLACTEC
 // Ubicación: app/page.tsx
-// BD: v3.5 — Iconos profesionales (Lucide) + Animación de carga
+// BD: v3.6 — Dashboard Integrado + RBAC
 // ============================================================================
 
 'use client';
@@ -10,7 +10,7 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { 
   ShoppingCart, FileText, Package, Zap, Receipt, Users, 
-  BarChart3, Map, LogOut, RefreshCw, Loader2, ShieldAlert 
+  BarChart3, Map, LogOut, RefreshCw, Loader2, ShieldAlert, LayoutDashboard 
 } from 'lucide-react';
 
 // ----------------------------------------------------------------------------
@@ -41,6 +41,7 @@ import GestionUsuarios from '../components/usuarios/GestionUsuarios';
 import VistaClientePedido from '../components/cliente/VistaClientePedido';
 import HistorialReportes from '../components/reportes/HistorialReportes';
 import MonitoreoRuta from '../components/rutas/MonitoreoRuta';
+import DashboardAdmin from '../components/dashboard/DashboardAdmin'; // 🔥 NUEVO
 
 // ----------------------------------------------------------------------------
 // 3. CONTROLADORES
@@ -73,10 +74,14 @@ import { obtenerUsuarios } from '../controllers/usuarioController';
 import { 
   obtenerHistorialCotizaciones, 
   obtenerHistorialDespachos, 
-  obtenerHistorialFacturas 
+  obtenerHistorialFacturas,
+  obtenerInventarioValorizado
 } from '../controllers/reporteController';
 
+import { obtenerDatosDashboard } from '../controllers/dashboardController'; // 🔥 NUEVO
+
 type TabActiva =
+  | 'DASHBOARD'
   | 'CATALOGO'
   | 'PRODUCTOS'
   | 'LOTES'
@@ -87,8 +92,8 @@ type TabActiva =
   | 'RUTAS';
 
 const TABS_PERMITIDAS: Record<string, string[]> = {
-  ADMINISTRADOR: ['CATALOGO', 'PRODUCTOS', 'LOTES', 'DESPACHO', 'FACTURACION', 'USUARIOS', 'REPORTES', 'RUTAS'],
-  GERENTE:       ['CATALOGO', 'LOTES', 'DESPACHO', 'FACTURACION', 'REPORTES', 'RUTAS'],
+  ADMINISTRADOR: ['DASHBOARD', 'CATALOGO', 'PRODUCTOS', 'LOTES', 'DESPACHO', 'FACTURACION', 'USUARIOS', 'REPORTES', 'RUTAS'],
+  GERENTE:       ['DASHBOARD', 'CATALOGO', 'LOTES', 'DESPACHO', 'FACTURACION', 'REPORTES', 'RUTAS'],
   BODEGA:        ['CATALOGO', 'LOTES', 'DESPACHO', 'RUTAS'],
   CAJERO:        ['CATALOGO', 'FACTURACION', 'REPORTES'],
   VENDEDOR:      ['CATALOGO', 'LOTES', 'REPORTES'],
@@ -108,13 +113,18 @@ export default function ERPDashboardPage() {
   const [ordenesPorFacturar, setOrdenesPorFacturar] = useState<OrdenDespachoEntity[]>([]);
   const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancariaEntity[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
-  const [cargando, setCargando] = useState(false);
-
+  
   const [historialCotizaciones, setHistorialCotizaciones] = useState<any[]>([]);
   const [historialDespachos, setHistorialDespachos] = useState<any[]>([]);
   const [historialFacturas, setHistorialFacturas] = useState<any[]>([]);
+  
+  const [dashboardData, setDashboardData] = useState<any>(null); // 🔥 NUEVO
+  const [inventario, setInventario] = useState<any[]>([]);
+  const [valorTotalBodega, setValorTotalBodega] = useState(0);
+  const [totalCajas, setTotalCajas] = useState(0);
+  const [cargando, setCargando] = useState(false);
 
-  const [tabActiva, setTabActiva] = useState<TabActiva>('CATALOGO');
+  const [tabActiva, setTabActiva] = useState<TabActiva>('DASHBOARD'); // 🔥 Iniciamos en Dashboard
 
   useEffect(() => {
     const sesion = cargarSesion();
@@ -130,7 +140,7 @@ export default function ERPDashboardPage() {
     try {
       const [
         cats, subs, provs, prods, lots, cots, ords, ctas, usrs,
-        histCots, histDesps, histFacs
+        histCots, histDesps, histFacs, dData, dataInventario
       ] = await Promise.all([
         obtenerCategorias(),
         obtenerSubcategorias(),
@@ -144,6 +154,8 @@ export default function ERPDashboardPage() {
         obtenerHistorialCotizaciones(),
         obtenerHistorialDespachos(),
         obtenerHistorialFacturas(),
+        obtenerDatosDashboard(), 
+        obtenerInventarioValorizado(),// 🔥 NUEVO
       ]);
 
       setCategorias(cats || []);
@@ -159,6 +171,11 @@ export default function ERPDashboardPage() {
       setHistorialCotizaciones(histCots || []);
       setHistorialDespachos(histDesps || []);
       setHistorialFacturas(histFacs || []);
+      
+      setDashboardData(dData); // 🔥 NUEVO
+      setInventario(dataInventario.inventario || []);
+      setValorTotalBodega(dataInventario.valorTotalBodega || 0);
+      setTotalCajas(dataInventario.totalCajas || 0);
     } catch (error) {
       console.error('Error al sincronizar datos:', error);
     } finally {
@@ -174,6 +191,8 @@ export default function ERPDashboardPage() {
   const handleLoginExitoso = async (usr: SesionUsuario) => {
     guardarSesion(usr);
     setUsuarioActivo(usr);
+    // Si es gerente o admin, que inicie en Dashboard
+    setTabActiva(usr.rol === 'ADMINISTRADOR' || usr.rol === 'GERENTE' ? 'DASHBOARD' : 'CATALOGO');
     await cargarDatosServidor();
   };
 
@@ -217,7 +236,13 @@ export default function ERPDashboardPage() {
   if (verificandoSesion) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9', fontFamily: 'system-ui' }}>
-        <Image src="/img/logo-agrolactec.png" alt="AgroLactec Logo" width={180} height={70} style={{ objectFit: 'contain', marginBottom: '20px' }} />
+        <Image 
+  src="/img/logo-agrolactec.png" 
+  alt="AgroLactec Logo" 
+  width={140} 
+  height={40} 
+  priority={true} // 🔥 Le dice a Next.js que cargue esta imagen de inmediato
+/>
         <Loader2 size={40} color="#0284c7" className="animate-spin" style={{ marginBottom: '15px' }} />
         <h2 style={{ margin: 0, color: '#1e293b', fontSize: '1.2rem' }}>Cargando Sistema...</h2>
         <p style={{ margin: '8px 0 0 0', color: '#64748b', fontSize: '0.9rem' }}>Verificando credenciales y sincronizando datos</p>
@@ -249,7 +274,7 @@ export default function ERPDashboardPage() {
     );
   }
 
-  // 4. 🔥 Pantalla de carga POST-login (Mientras se traen los datos)
+  // 4. Pantalla de carga POST-login
   if (cargando) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9', fontFamily: 'system-ui' }}>
@@ -263,6 +288,7 @@ export default function ERPDashboardPage() {
 
   // 5. Menú de Pestañas con Iconos
   const tabsVisibles = [
+    { key: 'DASHBOARD', label: 'Inicio', icon: <LayoutDashboard size={18} /> }, // 🔥 NUEVO
     { key: 'CATALOGO', label: 'Catálogo', icon: <ShoppingCart size={18} /> },
     { key: 'PRODUCTOS', label: 'Ficha de Producto', icon: <FileText size={18} /> },
     { key: 'LOTES', label: 'Entradas Bodega', icon: <Package size={18} /> },
@@ -338,6 +364,11 @@ export default function ERPDashboardPage() {
           </div>
         ) : (
           <>
+            {/* 🔥 RENDERIZADO DEL DASHBOARD */}
+            {tabActiva === 'DASHBOARD' && (
+              <DashboardAdmin datos={dashboardData} />
+            )}
+
             {tabActiva === 'CATALOGO' && (
               <VistaClientePedido
                 usuario={{
@@ -375,7 +406,7 @@ export default function ERPDashboardPage() {
             )}
 
             {tabActiva === 'REPORTES' && (
-              <HistorialReportes cotizaciones={historialCotizaciones} despachos={historialDespachos} facturas={historialFacturas} />
+              <HistorialReportes cotizaciones={historialCotizaciones} despachos={historialDespachos} facturas={historialFacturas}  inventario={inventario}  valorTotalBodega={valorTotalBodega} totalCajas={totalCajas} onRefrescar={cargarDatosServidor}  />
             )}
 
             {tabActiva === 'RUTAS' && (
