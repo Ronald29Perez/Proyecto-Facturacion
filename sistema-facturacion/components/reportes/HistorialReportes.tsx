@@ -21,9 +21,27 @@ export default function HistorialReportes({
   inventario, 
   valorTotalBodega, 
   totalCajas,
+  rolUsuario,
   onRefrescar // 🔥 Función para recargar datos
+
 }: any) {
-  const [tab, setTab] = useState<'COT' | 'DES' | 'FAC' | 'INV'>('COT');
+    // 🔥 Lógica de permisos dentro del reporte
+  const puedeVerCotizaciones = ['ADMINISTRADOR', 'GERENTE', 'VENDEDOR'].includes(rolUsuario);
+  const puedeVerFacturas = ['ADMINISTRADOR', 'GERENTE', 'CAJERO'].includes(rolUsuario);
+  const puedeVerDespachos = ['ADMINISTRADOR', 'GERENTE', 'BODEGA'].includes(rolUsuario);
+  const puedeVerInventario = ['ADMINISTRADOR', 'GERENTE', 'BODEGA'].includes(rolUsuario);
+
+    // Establecer la pestaña por defecto según el rol
+const [tab, setTab] = useState<'COT' | 'DES' | 'FAC' | 'INV'>(() => {
+  // Si es cajero, empieza en Facturas
+  if (rolUsuario === 'CAJERO') return 'FAC';
+  // Si es bodega, empieza en Inventario
+  if (rolUsuario === 'BODEGA') return 'INV';
+  // Si es vendedor, empieza en Cotizaciones
+  if (rolUsuario === 'VENDEDOR') return 'COT';
+  // Admin y Gerente empiezan en Cotizaciones
+  return 'COT';
+});
   const [detalleModal, setDetalleModal] = useState<any | null>(null);
   const [tipoModal, setTipoModal] = useState<'COT' | 'DES' | 'FAC' | null>(null);
 
@@ -112,12 +130,20 @@ export default function HistorialReportes({
       </div>
 
       {/* Pestañas */}
-      <div className="no-imprimir" style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px' }}>
-        <button onClick={() => setTab('COT')} style={tabBtn(tab === 'COT')}>📄 Cotizaciones ({cotizaciones.length})</button>
-        <button onClick={() => setTab('DES')} style={tabBtn(tab === 'DES')}>📦 Despachos ({despachos.length})</button>
-        <button onClick={() => setTab('FAC')} style={tabBtn(tab === 'FAC')}>🧾 Facturas ({facturas.length})</button>
-        <button onClick={() => setTab('INV')} style={tabBtn(tab === 'INV')}>📦 Inventario Valorizado</button>
-      </div>
+    <div className="no-imprimir" style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px' }}>
+    {puedeVerCotizaciones && (
+      <button onClick={() => setTab('COT')} style={tabBtn(tab === 'COT')}>📄 Cotizaciones ({cotizaciones.length})</button>
+    )}
+    {puedeVerDespachos && (
+      <button onClick={() => setTab('DES')} style={tabBtn(tab === 'DES')}>📦 Despachos ({despachos.length})</button>
+    )}
+    {puedeVerFacturas && (
+      <button onClick={() => setTab('FAC')} style={tabBtn(tab === 'FAC')}>🧾 Facturas ({facturas.length})</button>
+    )}
+    {puedeVerInventario && (
+      <button onClick={() => setTab('INV')} style={tabBtn(tab === 'INV')}>📦 Inventario Valorizado</button>
+    )}
+  </div>
 
       {/* ================= TABLA COTIZACIONES ================= */}
       {tab === 'COT' && (

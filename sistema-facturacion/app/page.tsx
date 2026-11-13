@@ -93,9 +93,9 @@ type TabActiva =
 
 const TABS_PERMITIDAS: Record<string, string[]> = {
   ADMINISTRADOR: ['DASHBOARD', 'CATALOGO', 'PRODUCTOS', 'LOTES', 'DESPACHO', 'FACTURACION', 'USUARIOS', 'REPORTES', 'RUTAS'],
-  GERENTE:       ['DASHBOARD', 'CATALOGO', 'LOTES', 'DESPACHO', 'FACTURACION', 'REPORTES', 'RUTAS'],
-  BODEGA:        ['CATALOGO', 'LOTES', 'DESPACHO', 'RUTAS'],
-  CAJERO:        ['CATALOGO', 'FACTURACION', 'REPORTES'],
+  GERENTE:       ['DASHBOARD', 'LOTES', 'DESPACHO', 'FACTURACION', 'REPORTES', 'RUTAS'],
+  BODEGA:        ['LOTES', 'DESPACHO', 'RUTAS', 'REPORTES'],
+  CAJERO:        ['FACTURACION', 'REPORTES'],
   VENDEDOR:      ['CATALOGO', 'LOTES', 'REPORTES'],
   CLIENTE:       [],
 };
@@ -406,7 +406,7 @@ export default function ERPDashboardPage() {
             )}
 
             {tabActiva === 'REPORTES' && (
-              <HistorialReportes cotizaciones={historialCotizaciones} despachos={historialDespachos} facturas={historialFacturas}  inventario={inventario}  valorTotalBodega={valorTotalBodega} totalCajas={totalCajas} onRefrescar={cargarDatosServidor}  />
+              <HistorialReportes cotizaciones={historialCotizaciones} despachos={historialDespachos} facturas={historialFacturas}  inventario={inventario}  valorTotalBodega={valorTotalBodega} totalCajas={totalCajas}  rolUsuario={usuarioActivo.rol}  onRefrescar={cargarDatosServidor}  />
             )}
 
             {tabActiva === 'RUTAS' && (

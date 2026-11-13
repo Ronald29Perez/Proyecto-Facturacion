@@ -11,7 +11,7 @@ import Image from 'next/image';
 import { supabase } from '../../lib/supabase';
 import { 
   ShoppingCart, LogOut, Search, Plus, Trash2, Send, 
-  CheckCircle, CreditCard, Building2, ArrowLeft, ShieldCheck, Lock, Package, ShoppingBag
+  CheckCircle, CreditCard, Building2, ArrowLeft, ShieldCheck, Lock, Package, ShoppingBag, Truck
 } from 'lucide-react';
 import { ProductoEntity, CategoriaEntity, Usuario, ResumenCarrito, ItemCarrito as ItemCarritoModel } from '../../models/agrolactec';
 import { crearCotizacionDesdeCarrito } from '../../controllers/cotizacionController';
@@ -611,6 +611,14 @@ export default function VistaClientePedido({
                 const pasosEstado = ['PENDIENTE', 'PAGADO', 'APROBADO_DESPACHO', 'FACTURADO'];
                 const indiceActual = pasosEstado.indexOf(pedido.estado);
 
+                // Dentro del map, calculamos la fecha estimada de entrega
+                const fechaPedido = new Date(pedido.fecha_emision);
+                const fechaEstimada = new Date(fechaPedido);
+                fechaEstimada.setDate(fechaEstimada.getDate() + 2); // Sumamos 2 días
+                const fechaEntregaStr = fechaEstimada.toLocaleDateString('es-SV', { 
+                  weekday: 'long', day: 'numeric', month: 'long' 
+                });
+
                 return (
                   <div key={pedido.id_cotizacion} style={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '20px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                     
@@ -620,6 +628,14 @@ export default function VistaClientePedido({
                         <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 'bold', display: 'block' }}>N° de Pedido</span>
                         <strong style={{ color: '#0284c7', fontSize: '1.1rem' }}>{pedido.numero_cotizacion}</strong>
                         <span style={{ fontSize: '0.8rem', color: '#94a3b8', marginLeft: '10px' }}>{new Date(pedido.fecha_emision).toLocaleDateString()}</span>
+
+                        {/* 🔥 NUEVO: Fecha estimada de entrega */}
+                        <div style={{ marginTop: '10px', padding: '8px 12px', backgroundColor: '#eff6ff', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <Truck size={16} color="#0284c7" />
+                          <span style={{ fontSize: '0.85rem', color: '#1e3a8a' }}>
+                            <strong>Entrega estimada:</strong> {fechaEntregaStr}
+                          </span>
+                        </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                         <div>
