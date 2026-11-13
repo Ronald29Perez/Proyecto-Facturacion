@@ -1,106 +1,148 @@
 // ============================================================================
-// CONTROLADOR DE AUTENTICACIÓN CON DEPURACIÓN
+// CONTROLADOR DE AUTENTICACIÓN
 // Ubicación: controllers/authController.ts
+// BD: v3.0 — tabla 'usuarios' con 'rol' y 'password_hash'
 // ============================================================================
 
 import { supabase } from '../lib/supabase';
-import { Usuario } from '../models/agrolactec';
+import { Usuario, RolUsuario } from '../models/agrolactec';
 
+export interface SesionUsuario {
+  id_usuario: string;
+  nombre_completo: string;
+  username: string;
+  rol: RolUsuario;
+  activo: boolean;
+}
+
+/**
+ * Inicia sesión con username + password.
+ * Devuelve el usuario autenticado (sin password_hash) o null.
+ */
 export async function iniciarSesion(
   username: string,
   password: string
-): Promise<{ success: boolean; message: string; usuario?: Usuario }> {
+): Promise<{ success: boolean; message: string; usuario?: SesionUsuario }> {
   try {
-    const usernameLimpio = username.trim().toLowerCase();
+    const user = username.toLowerCase().trim();
 
-    // 1. Consultar el usuario ignorando mayúsculas/minúsculas
-    const { data: usuario, error } = await supabase
+    // 1. Buscar usuario por username
+    const { data, error } = await supabase
       .from('usuarios')
-      .select('*')
-      .ilike('username', usernameLimpio)
-      .eq('activo', true)
+      .select('id_usuario, nombre_completo, username, password_hash, rol, activo')
+      .eq('username', user)
       .maybeSingle();
 
     if (error) {
-      console.error('Error de Supabase al consultar usuario:', error.message);
-      return { success: false, message: `Error de BD: ${error.message}` };
+      console.error('Error al autenticar:', error.message);
+      return { success: false, message: 'Error al consultar el usuario.' };
     }
 
-    if (!usuario) {
-      return {
-        success: false,
-        message: 'Usuario no encontrado o cuenta inactiva.',
-      };
+    if (!data) {
+      return { success: false, message: '❌ Usuario o contraseña incorrectos.' };
     }
 
-    // 2. Validar contraseña usando la función RPC
-    const { data: esValido, error: errAuth } = await supabase.rpc('validar_password', {
-      user_name: usernameLimpio,
-      pass_plain: password,
-    });
-
-    if (errAuth) {
-      console.error('Error en RPC validar_password:', errAuth.message);
+    if (!data.activo) {
+      return { success: false, message: '❌ La cuenta está desactivada.' };
     }
 
-    if (!esValido) {
-      return { success: false, message: 'Contraseña incorrecta.' };
+    // 2. Verificar contraseña
+    const passwordValida = await verificarPassword(password, data.password_hash);
+    if (!passwordValida) {
+      return { success: false, message: '❌ Usuario o contraseña incorrectos.' };
     }
 
-    // 3. Estructurar el objeto de usuario y guardar sesión local
-    const usuarioAutenticado: Usuario = {
-      id_usuario: usuario.id_usuario,
-      nombre_completo: usuario.nombre_completo,
-      username: usuario.username,
-      id_rol: usuario.rol,
-      activo: usuario.activo,
-      rol: {
-        id_rol: usuario.rol,
-        nombre_rol: usuario.rol,
-        descripcion: `Rol de ${usuario.rol}`,
-      },
+    // 3. Devolver usuario SIN password_hash
+    const sesion: SesionUsuario = {
+      id_usuario: data.id_usuario,
+      nombre_completo: data.nombre_completo,
+      username: data.username,
+      rol: data.rol as RolUsuario,
+      activo: data.activo,
     };
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('agrolactec_usuario', JSON.stringify(usuarioAutenticado));
-    }
 
     return {
       success: true,
-      message: '✅ Inicio de sesión exitoso.',
-      usuario: usuarioAutenticado,
+      message: `✅ Bienvenido, ${data.nombre_completo}.`,
+      usuario: sesion,
     };
-  } catch (err) {
-    console.error('Error general en iniciarSesion:', err);
-    return {
-      success: false,
-      message: 'Error al conectar con el servicio de autenticación.',
-    };
+  } catch (err: any) {
+    console.error('Error de servidor en iniciarSesion:', err);
+    return { success: false, message: 'Error inesperado al iniciar sesión.' };
   }
 }
 
-export async function obtenerUsuarioActual(): Promise<Usuario | null> {
+/**
+ * Verifica la contraseña comparando con el hash.
+ * Soporta bcrypt ($2a$...) y texto plano (dev).
+ */
+async function verificarPassword(plain: string, hash: string): Promise<boolean> {
+  // Caso A: hash bcrypt
+  if (hash && hash.startsWith('$2')) {
+    try {
+      // bcryptjs is an optional runtime dependency; keep this import optional for TypeScript.
+      // @ts-ignore -- bcryptjs may not have installed type declarations.
+      const bcrypt = await import('bcryptjs');
+      return await bcrypt.compare(plain, hash);
+    } catch (e) {
+      console.warn('bcryptjs no instalado. Se comparará en texto plano.');
+      return plain === hash;
+    }
+  }
+  // Caso B: texto plano (dev)
+  return plain === hash;
+}
+
+/**
+ * Helper para el login del cliente final (sin tabla clientes aún)
+ * Solo simula la sesión de un cliente genérico.
+ */
+export function iniciarSesionCliente(): SesionUsuario {
+  return {
+    id_usuario: '00000000-0000-0000-0000-000000000000',
+    nombre_completo: 'Cliente Invitado',
+    username: 'cliente',
+    rol: 'CLIENTE',
+    activo: true,
+  };
+}
+
+/**
+ * Guarda la sesión en localStorage
+ */
+export function guardarSesion(usuario: SesionUsuario) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('agrolactec_sesion', JSON.stringify(usuario));
+  }
+}
+
+/**
+ * Carga la sesión desde localStorage
+ */
+export function cargarSesion(): SesionUsuario | null {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem('agrolactec_sesion');
+  if (!raw) return null;
   try {
-    if (typeof window === 'undefined') return null;
-
-    const usuarioGuardado = localStorage.getItem('agrolactec_usuario');
-    if (!usuarioGuardado) return null;
-
-    return JSON.parse(usuarioGuardado) as Usuario;
-  } catch (err) {
-    console.error('Error al recuperar usuario actual:', err);
+    return JSON.parse(raw);
+  } catch {
     return null;
   }
 }
 
-export async function cerrarSesion(): Promise<{ success: boolean; message: string }> {
-  try {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('agrolactec_usuario');
-    }
-    return { success: true, message: 'Sesión cerrada correctamente.' };
-  } catch (err) {
-    return { success: false, message: 'Error al cerrar sesión.' };
+/**
+ * Cierra sesión
+ */
+export function cerrarSesion() {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('agrolactec_sesion');
   }
 }
 
+/**
+ * Verifica si el usuario logueado tiene permiso de acceder a un rol específico
+ */
+export function tienePermiso(usuario: SesionUsuario | null, rolesPermitidos: RolUsuario[]): boolean {
+  if (!usuario) return false;
+  return rolesPermitidos.includes(usuario.rol);
+}

@@ -1,28 +1,32 @@
 // ============================================================================
-// CONTROLADOR DE IMPORTACIÓN Y EXPORTACIÓN MASIVA CSV
+// CONTROLADOR DE UTILIDADES CSV (Parseo, Formateo, Descarga)
 // Ubicación: controllers/csvController.ts
+// BD: v3.0 — no toca la BD, solo manipula archivos
 // ============================================================================
 
 import Papa from 'papaparse';
-import { supabase } from '../lib/supabase';
-import { ProductoEstructurado, Categoria, Proveedor } from '../models/agrolactec';
+
+// ============================================================================
+// 1. NORMALIZACIÓN DE TEXTO
+// ============================================================================
 
 /**
- * Normaliza cadenas quitando tildes, mayúsculas y caracteres especiales
+ * Quita tildes, mayúsculas y caracteres especiales
  */
-function normalizarTexto(texto: string): string {
+export function normalizarTexto(texto: string): string {
   if (!texto) return '';
   return texto
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]/g, '');
+    .replace(/[^a-z0-9]/g, '')
+    .trim();
 }
 
 /**
- * Convierte textos con símbolos de moneda y comas a números decimales válidos
+ * Convierte "$1,234.56" o "1.234,56" a número válido
  */
-function limpiarNumero(val: any): number {
+export function limpiarNumero(val: any): number {
   if (val === undefined || val === null) return 0;
   const str = String(val)
     .replace(/\$/g, '')
@@ -33,197 +37,140 @@ function limpiarNumero(val: any): number {
   return isNaN(num) ? 0 : num;
 }
 
-/**
- * 1. Convierte el catálogo de productos a CSV y fuerza la descarga
- */
-  /**
-         * Convierte el catálogo de productos a formato CSV y fuerza la descarga.
-         * Si la lista en memoria está vacía, consulta directamente a Supabase.
-         */
-        export async function exportarProductosCSV(productosEnMemoria: ProductoEstructurado[]) {
-        try {
-            let listaFinal: ProductoEstructurado[] = productosEnMemoria;
-
-            // Si la lista recibida está vacía, consultamos directamente a Supabase
-            if (!listaFinal || listaFinal.length === 0) {
-            const { data, error } = await supabase
-                .from('productos')
-                .select(`
-                *,
-                categorias (nombre_categoria),
-                proveedores (nombre_proveedor)
-                `)
-                .eq('activo', true);
-
-            if (error) {
-                alert(`Error al obtener productos para exportar: ${error.message}`);
-                return;
-            }
-
-            listaFinal = (data || []).map((p: any) => ({
-                ...p,
-                nombre_categoria: p.categorias?.nombre_categoria || '',
-                nombre_proveedor: p.proveedores?.nombre_proveedor || '',
-            }));
-            }
-
-            if (listaFinal.length === 0) {
-            alert('No existen productos registrados en la base de datos para exportar.');
-            return;
-            }
-
-            // Prepara los datos con los nombres de columnas estándar para Excel / CSV
-            const datosFormateados = listaFinal.map((p) => ({
-            'Codigo_Item': p.item_code || '',
-            'UPC_Codigo_Barras': p.codigo_barras || p.upc || '',
-            'Nombre_Producto': p.nombre_producto || (p as any).nombre || '',
-            'Categoria': p.categoria?.nombre_categoria || p.nombre_categoria || '',
-            'Proveedor': p.proveedor?.nombre_proveedor || p.nombre_proveedor || '',
-            'Unidades_Por_Caja': p.unidades_por_caja || 12,
-            'Precio_Detalle_B2C': p.precio_detalle || 0,
-            'Precio_Mayoreo_B2B': p.precio_mayoreo || 0,
-            }));
-
-            // Genera la cadena CSV mediante PapaParse
-            const csvString = Papa.unparse(datosFormateados, {
-            delimiter: ',',
-            header: true,
-            });
-
-            // Crear el archivo Blob y forzar la descarga en el navegador
-            const blob = new Blob(['\ufeff' + csvString], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute(
-            'download',
-            `Catalogo_Productos_AgroLactec_${new Date().toISOString().slice(0, 10)}.csv`
-            );
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        } catch (err) {
-            console.error('Error al exportar productos a CSV:', err);
-            alert('Ocurrió un error inesperado al generar el archivo CSV.');
-        }
-        }
+// ============================================================================
+// 2. DESCARGA CSV (desde cualquier array de objetos)
+// ============================================================================
 
 /**
- * 2. Importa el catálogo desde un archivo CSV mapeando a la columna 'codigo_barras'
+ * Genera un CSV y lo descarga forzando el navegador
  */
-export async function importarProductosCSV(
-  file: File,
-  categoriasExistentes: Categoria[],
-  proveedoresExistentes: Proveedor[]
-): Promise<{ success: boolean; message: string; procesados: number }> {
+export function descargarCSV(
+  datos: Record<string, any>[],
+  nombreArchivo: string
+): void {
+  try {
+    if (!datos || datos.length === 0) {
+      alert('No hay datos para exportar.');
+      return;
+    }
+
+    const csvString = Papa.unparse(datos, {
+      delimiter: ',',
+      header: true,
+    });
+
+    // BOM para que Excel respete tildes
+    const blob = new Blob(['\ufeff' + csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${nombreArchivo}_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('Error al descargar CSV:', err);
+    alert('Error al generar el archivo CSV.');
+  }
+}
+
+// ============================================================================
+// 3. PARSEO DE CSV (desde archivo subido)
+// ============================================================================
+
+export interface ResultadoParseoCSV {
+  success: boolean;
+  message: string;
+  datos: Record<string, string>[];  // Filas ya parseadas
+}
+
+/**
+ * Lee un archivo CSV y devuelve las filas crudas como objetos.
+ * NO guarda en BD, solo parsea.
+ */
+export function parsearArchivoCSV(file: File): Promise<ResultadoParseoCSV> {
   return new Promise((resolve) => {
     Papa.parse(file, {
-      header: false,
+      header: true,           // Primera fila son los headers
       skipEmptyLines: 'greedy',
-      complete: async (results) => {
+      transformHeader: (h) => normalizarTexto(h),  // Normalizamos los headers
+      complete: (results) => {
         try {
-          const lineas = results.data as string[][];
-
-          if (!lineas || lineas.length === 0) {
-            resolve({ success: false, message: 'El archivo está vacío.', procesados: 0 });
+          if (!results.data || results.data.length === 0) {
+            resolve({ success: false, message: 'El archivo está vacío.', datos: [] });
             return;
           }
 
-          // 1. Encontrar la fila donde están los encabezados
-          let idxCabecera = -1;
-          for (let i = 0; i < lineas.length; i++) {
-            const filaNorm = lineas[i].map(normalizarTexto);
-            if (
-              filaNorm.some((c) => c.includes('codigo') || c.includes('item')) &&
-              filaNorm.some((c) => c.includes('nombre') || c.includes('producto'))
-            ) {
-              idxCabecera = i;
-              break;
-            }
-          }
+          // Filtrar filas vacías
+          const filasLimpias = (results.data as any[]).filter(
+            (fila) => Object.values(fila).some((v) => v && String(v).trim() !== '')
+          );
 
-          if (idxCabecera === -1) {
-            resolve({
-              success: false,
-              message: 'No se encontraron las columnas de Código y Nombre en el archivo.',
-              procesados: 0,
-            });
+          if (filasLimpias.length === 0) {
+            resolve({ success: false, message: 'No hay filas con datos.', datos: [] });
             return;
           }
 
-          const cabeceras = lineas[idxCabecera].map(normalizarTexto);
-          const filasDatos = lineas.slice(idxCabecera + 1);
-
-          // Buscar posiciones de cada columna en el CSV
-          const idxItemCode = cabeceras.findIndex((c) => c.includes('codigo') || c.includes('item'));
-          const idxNombre = cabeceras.findIndex((c) => c.includes('nombre') || c.includes('producto'));
-          const idxCodigoBarras = cabeceras.findIndex((c) => c.includes('upc') || c.includes('barras') || c.includes('barcode'));
-          const idxCat = cabeceras.findIndex((c) => c.includes('categoria'));
-          const idxProv = cabeceras.findIndex((c) => c.includes('proveedor'));
-          const idxUnidades = cabeceras.findIndex((c) => c.includes('unidades') || c.includes('caja'));
-          const idxPrecioDet = cabeceras.findIndex((c) => c.includes('detalle') || c.includes('b2c'));
-          const idxPrecioMay = cabeceras.findIndex((c) => c.includes('mayoreo') || c.includes('b2b'));
-
-          const catMap = new Map(categoriasExistentes.map((c) => [normalizarTexto(c.nombre_categoria), c.id_categoria]));
-          const provMap = new Map(proveedoresExistentes.map((p) => [normalizarTexto(p.nombre_proveedor), p.id_proveedor]));
-
-          const productosAInsertar: any[] = [];
-
-          for (const fila of filasDatos) {
-            const itemCode = idxItemCode !== -1 ? (fila[idxItemCode] || '').trim() : '';
-            const nombreProd = idxNombre !== -1 ? (fila[idxNombre] || '').trim() : '';
-
-            if (!itemCode || !nombreProd) continue;
-
-            const codigoBarrasVal = idxCodigoBarras !== -1 ? (fila[idxCodigoBarras] || '').trim() : '';
-            const nomCat = idxCat !== -1 ? normalizarTexto(fila[idxCat]) : '';
-            const nomProv = idxProv !== -1 ? normalizarTexto(fila[idxProv]) : '';
-
-            const unidadesCaja = idxUnidades !== -1 ? limpiarNumero(fila[idxUnidades]) || 12 : 12;
-            const precioDetalle = idxPrecioDet !== -1 ? limpiarNumero(fila[idxPrecioDet]) : 0;
-            const precioMayoreo = idxPrecioMay !== -1 ? limpiarNumero(fila[idxPrecioMay]) : 0;
-
-            const idCat = catMap.get(nomCat) || categoriasExistentes[0]?.id_categoria || null;
-            const idProv = provMap.get(nomProv) || proveedoresExistentes[0]?.id_proveedor || null;
-
-            // Mapeo exacto a las columnas de tu tabla 'productos' en Supabase
-            productosAInsertar.push({
-              id_producto: crypto.randomUUID(),
-              item_code: itemCode,
-              codigo_barras: codigoBarrasVal,
-              nombre_producto: nombreProd,
-              id_categoria: idCat,
-              id_proveedor: idProv,
-              unidades_por_caja: unidadesCaja,
-              precio_detalle: precioDetalle,
-              precio_mayoreo: precioMayoreo,
-              activo: true,
-            });
-          }
-
-          if (productosAInsertar.length === 0) {
-            resolve({ success: false, message: 'No se encontraron datos válidos en el archivo.', procesados: 0 });
-            return;
-          }
-
-          const { error } = await supabase.from('productos').insert(productosAInsertar);
-
-          if (error) {
-            console.error('Error al insertar en Supabase:', error.message);
-            resolve({ success: false, message: `Error en la base de datos: ${error.message}`, procesados: 0 });
-          } else {
-            resolve({
-              success: true,
-              message: '✅ Importación masiva completada exitosamente.',
-              procesados: productosAInsertar.length,
-            });
-          }
+          resolve({
+            success: true,
+            message: `${filasLimpias.length} filas leídas.`,
+            datos: filasLimpias,
+          });
         } catch (err) {
-          console.error('Error al procesar el archivo:', err);
-          resolve({ success: false, message: 'Error al procesar el archivo CSV.', procesados: 0 });
+          console.error('Error al procesar CSV:', err);
+          resolve({ success: false, message: 'Error al procesar el archivo.', datos: [] });
         }
+      },
+      error: (err) => {
+        resolve({ success: false, message: `Error de lectura: ${err.message}`, datos: [] });
       },
     });
   });
-      
+}
+
+// ============================================================================
+// 4. MAPEO DE COLUMNAS (detecta automáticamente los headers)
+// ============================================================================
+
+export interface MapaColumnasProducto {
+  item_code: string;
+  nombre: string;
+  categoria: string;
+  subcategoria: string;
+  proveedor: string;
+  nso: string;
+  precio_b2c: string;
+  precio_b2b: string;
+  unidades_por_caja: string;
+  unidad_medida: string;
+}
+
+/**
+ * Detecta qué columna del CSV corresponde a cada campo esperado.
+ * Tolera variaciones como "Código Item", "UPC", "Precio Detalle", etc.
+ */
+export function detectarColumnasProducto(headers: string[]): Partial<MapaColumnasProducto> {
+  const normHeaders = headers.map(h => normalizarTexto(h));
+
+  const buscar = (variantes: string[]): string => {
+    for (const variante of variantes) {
+      const idx = normHeaders.findIndex(h => h.includes(variante));
+      if (idx !== -1) return headers[idx];
+    }
+    return '';
+  };
+
+  return {
+    item_code: buscar(['itemcode', 'codigo', 'item', 'sku']),
+    nombre: buscar(['nombre', 'producto', 'descripcion']),
+    categoria: buscar(['categoria', 'rubro']),
+    subcategoria: buscar(['subcategoria', 'sub']),
+    proveedor: buscar(['proveedor', 'marca']),
+    nso: buscar(['nso', 'registro', 'sanitario']),
+    precio_b2c: buscar(['preciob2c', 'detalle', 'preciodetalle', 'minorista']),
+    precio_b2b: buscar(['preciob2b', 'mayoreo', 'preciomayoreo', 'mayorista']),
+    unidades_por_caja: buscar(['unidades', 'caja', 'factor']),
+    unidad_medida: buscar(['unidadmedida', 'medida', 'empaque']),
+  };
 }

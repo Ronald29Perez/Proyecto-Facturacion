@@ -1,143 +1,179 @@
 // ============================================================================
-// COMPONENTE FORMULARIO DE LOGIN (USERNAME)
+// COMPONENTE: FORMULARIO DE LOGIN
 // Ubicación: components/auth/LoginForm.tsx
 // ============================================================================
 
 'use client';
 
-import React, { useState } from 'react';
-import { Usuario } from '../../models/agrolactec';
-import { iniciarSesion } from '../../controllers/authController';
+import { useState } from 'react';
+import { iniciarSesion, SesionUsuario } from '../../controllers/authController';
+import Image from 'next/image';
+import { Lock, Loader2 } from 'lucide-react';
 
 interface Props {
-  onLoginExitoso: (usuario: Usuario) => void;
+  onLoginExitoso: (usuario: SesionUsuario) => void | Promise<void>;
 }
 
 export default function LoginForm({ onLoginExitoso }: Props) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
-  const [errorMensaje, setErrorMensaje] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMensaje('');
-
-    if (!username.trim() || !password.trim()) {
-      setErrorMensaje('Por favor ingresa tu usuario y contraseña.');
-      return;
-    }
-
+    setError('');
     setCargando(true);
+
     const resultado = await iniciarSesion(username, password);
-    setCargando(false);
 
     if (resultado.success && resultado.usuario) {
-      onLoginExitoso(resultado.usuario);
+      await onLoginExitoso(resultado.usuario);
     } else {
-      setErrorMensaje(resultado.message);
+      setError(resultado.message);
     }
+
+    setCargando(false);
   };
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
-      <div
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f1f5f9',
+        fontFamily: 'system-ui, sans-serif',
+        padding: '20px',
+      }}
+    >
+      <form
+        onSubmit={handleLogin}
         style={{
+          backgroundColor: '#ffffff',
+          padding: '32px',
+          borderRadius: '12px',
+          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
           width: '100%',
           maxWidth: '400px',
-          padding: '30px',
-          borderRadius: '12px',
-          backgroundColor: '#ffffff',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-          border: '1px solid #e2e8f0',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
         }}
       >
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <h2 style={{ margin: 0, color: '#1e293b', fontSize: '1.5rem' }}>🧀 AgroLactec ERP</h2>
-          <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
-            Ingresa tu usuario y contraseña para acceder
+        {/* LOGO / TÍTULO */}
+        <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
+            <Image 
+              src="/img/logo-agrolactec.png" 
+              alt="AgroLactec Logo" 
+              width={220} 
+              height={80} 
+              style={{ objectFit: 'contain' }} 
+            />
+          </div>
+          <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
+            Sistema de Pedidos e Inventario
           </p>
         </div>
 
-        {errorMensaje && (
+        {/* USERNAME */}
+        <div>
+          <label style={labelStyle}>Usuario</label>
+          <input
+            type="text"
+            placeholder="Ej: admin"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+            autoComplete="username"
+            style={inputStyle}
+          />
+        </div>
+
+        {/* PASSWORD */}
+        <div>
+          <label style={labelStyle}>Contraseña</label>
+          <input
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoComplete="current-password"
+            style={inputStyle}
+          />
+        </div>
+
+        {/* ERROR */}
+        {error && (
           <div
             style={{
-              padding: '10px',
               backgroundColor: '#fef2f2',
               border: '1px solid #fecaca',
-              color: '#991b1b',
+              color: '#b91c1c',
+              padding: '10px',
               borderRadius: '6px',
               fontSize: '0.85rem',
-              marginBottom: '16px',
             }}
           >
-            ⚠️ {errorMensaje}
+            {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div>
-            <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#334155' }}>
-              Usuario (Username):
-            </label>
-            <input
-              type="text"
-              placeholder="Ej: admin_test"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                marginTop: '4px',
-                fontSize: '0.9rem',
-                boxSizing: 'border-box',
-              }}
-            />
-          </div>
-
-          <div>
-            <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#334155' }}>
-              Contraseña:
-            </label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                marginTop: '4px',
-                fontSize: '0.9rem',
-                boxSizing: 'border-box',
-              }}
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={cargando}
-            style={{
-              width: '100%',
-              padding: '12px',
-              backgroundColor: '#2563eb',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '6px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              fontSize: '0.95rem',
-              marginTop: '8px',
-            }}
-          >
-            {cargando ? 'Iniciando sesión...' : '🔒 Iniciar Sesión'}
-          </button>
-        </form>
-      </div>
+        {/* BOTÓN */}
+        <button
+          type="submit"
+          disabled={cargando}
+          style={{
+            backgroundColor: cargando ? '#94a3b8' : '#2563eb',
+            color: '#ffffff',
+            border: 'none',
+            padding: '12px',
+            borderRadius: '6px',
+            fontWeight: 'bold',
+            fontSize: '1rem',
+            cursor: cargando ? 'not-allowed' : 'pointer',
+            marginTop: '8px',
+            display: 'flex',           // 🔥 Alinea el icono y el texto
+            alignItems: 'center',      // 🔥 Alinea el icono y el texto
+            justifyContent: 'center',  // 🔥 Centra todo
+            gap: '8px',                // 🔥 Espacio entre el icono y el texto
+            transition: 'background-color 0.2s'
+          }}
+        >
+          {cargando ? (
+            <>
+              <Loader2 size={20} className="animate-spin" /> {/* Icono de carga girando */}
+              Ingresando...
+            </>
+          ) : (
+            <>
+              <Lock size={20} />
+              Iniciar Sesión
+            </>
+          )}
+        </button>
+      </form>
     </div>
   );
 }
+
+// Estilos compartidos
+const labelStyle: React.CSSProperties = {
+  display: 'block',
+  fontSize: '0.85rem',
+  fontWeight: 'bold',
+  color: '#475569',
+  marginBottom: '4px',
+};
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '10px 12px',
+  borderRadius: '6px',
+  border: '1px solid #cbd5e1',
+  fontSize: '0.95rem',
+  outline: 'none',
+};

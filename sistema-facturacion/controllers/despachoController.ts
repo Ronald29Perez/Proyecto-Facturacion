@@ -1,17 +1,18 @@
 // ============================================================================
-// CONTROLADOR DE BODEGA, LOTES Y DESPACHO FIFO (CORREGIDO)
+// CONTROLADOR DE BODEGA, LOTES Y DESPACHO FIFO
 // Ubicación: controllers/despachoController.ts
+// BD: v3.1 — conversión automática de Cajas a Unidades Base
 // ============================================================================
 
 import { supabase } from '../lib/supabase';
-import { LoteEntity } from '../models/agrolactec';
+import { LoteEntity, OrdenDespachoEntity } from '../models/agrolactec';
 
 /**
- * 1. Obtiene la lista de lotes ordenados por fecha de vencimiento (Estrategia FIFO)
+ * 1. Obtiene la lista de lotes ordenados por fecha de vencimiento (FIFO)
+ * Solo trae lotes con stock > 0.
  */
 export async function obtenerLotesOrdenadosFIFO(): Promise<LoteEntity[]> {
   try {
-    // CORRECCIÓN: Se actualiza 'nombre' por 'nombre_producto' en la relación
     const { data, error } = await supabase
       .from('lotes')
       .select(`
@@ -19,11 +20,14 @@ export async function obtenerLotesOrdenadosFIFO(): Promise<LoteEntity[]> {
         productos (
           id_producto,
           item_code,
-          nombre_producto,
-          unidades_por_caja
+          nombre,
+          unidad_medida,
+          unidades_por_caja,
+          precio_b2c,
+          precio_b2b
         )
       `)
-      .gt('unidades_disponibles', 0)
+      .gt('cantidad_disponible', 0)
       .order('fecha_vencimiento', { ascending: true });
 
     if (error) {
@@ -31,31 +35,27 @@ export async function obtenerLotesOrdenadosFIFO(): Promise<LoteEntity[]> {
       return [];
     }
 
-    // Mapear la información para asegurar compatibilidad con la interfaz LoteEntity
-    const lotesFormateados: LoteEntity[] = (data || []).map((item: any) => ({
-      id_lote: item.id_lote,
-      id_producto: item.id_producto,
-      codigo_lote: item.codigo_lote,
-      fecha_ingreso: item.fecha_ingreso,
-      fecha_vencimiento: item.fecha_vencimiento,
-      cajas_ingresadas: item.cajas_ingresadas,
-      cajas_disponibles: item.cajas_disponibles,
-      unidades_disponibles: item.unidades_disponibles,
-      estado_vencimiento: item.estado_vencimiento || 'NORMAL',
-      producto: item.productos
-        ? {
-            id_producto: item.productos.id_producto,
-            item_code: item.productos.item_code,
-            nombre_producto: item.productos.nombre_producto,
-            unidades_por_caja: item.productos.unidades_por_caja,
-            // Fallback para propiedades obligatorias en la interfaz
-            id_categoria: '',
-            id_proveedor: '',
-            precio_detalle: 0,
-            precio_mayoreo: 0,
-          }
-        : undefined,
-    }));
+    const lotesFormateados: LoteEntity[] = (data || []).map((item: any) => {
+      const hoy = new Date();
+      const vence = new Date(item.fecha_vencimiento);
+      const diasRestantes = Math.ceil((vence.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+
+      let estado: 'NORMAL' | 'POR_VENCER' | 'VENCIDO' = 'NORMAL';
+      if (diasRestantes < 0) estado = 'VENCIDO';
+      else if (diasRestantes <= 7) estado = 'POR_VENCER';
+
+      return {
+        id_lote: item.id_lote,
+        id_producto: item.id_producto,
+        codigo_lote: item.codigo_lote,
+        fecha_ingreso: item.fecha_ingreso,
+        fecha_vencimiento: item.fecha_vencimiento,
+        cantidad_disponible: item.cantidad_disponible,
+        created_at: item.created_at,
+        estado_vencimiento: estado,
+        productos: item.productos || undefined,
+      };
+    });
 
     return lotesFormateados;
   } catch (err) {
@@ -65,35 +65,60 @@ export async function obtenerLotesOrdenadosFIFO(): Promise<LoteEntity[]> {
 }
 
 /**
- * 2. Registra una nueva entrada de lote a bodega
+ * 2. Registra una nueva entrada de lote a bodega.
+ * 🔥 Si el producto NO se vende por caja (ej. se vende por unidad),
+ *    convierte las "cajas físicas" ingresadas a "unidades base" para el inventario.
  */
 export async function registrarNuevoLote(nuevoLote: {
   id_producto: string;
   codigo_lote: string;
   fecha_vencimiento: string;
-  cajas_ingresadas: number;
-  unidades_disponibles: number;
+  cantidad_ingresada: number;  // 🔥 Cajas físicas que el bodeguero recibió
 }): Promise<{ success: boolean; message: string }> {
   try {
-    const registro = {
-      id_lote: crypto.randomUUID(),
-      id_producto: nuevoLote.id_producto,
-      codigo_lote: nuevoLote.codigo_lote,
-      fecha_vencimiento: nuevoLote.fecha_vencimiento,
-      cajas_ingresadas: nuevoLote.cajas_ingresadas,
-      cajas_disponibles: nuevoLote.cajas_ingresadas,
-      unidades_disponibles: nuevoLote.unidades_disponibles,
-      estado_vencimiento: 'NORMAL',
-    };
+    // 1. Obtener producto para saber cómo se vende y su factor
+    const { data: prod, error: errProd } = await supabase
+      .from('productos')
+      .select('unidad_medida, unidades_por_caja')
+      .eq('id_producto', nuevoLote.id_producto)
+      .single();
 
-    const { error } = await supabase.from('lotes').insert([registro]);
+    if (errProd || !prod) {
+      return { success: false, message: 'Producto no encontrado.' };
+    }
+
+    // 2. Calcular el stock en "unidad base"
+    // Si el producto se vende por caja -> cantidad = cajas
+    // Si se vende por unidad/libra -> cantidad = cajas * factor
+    let cantidadFinal = nuevoLote.cantidad_ingresada;
+
+    if (prod.unidad_medida !== 'CAJA') {
+      cantidadFinal = nuevoLote.cantidad_ingresada * (prod.unidades_por_caja || 1);
+    }
+
+    // 3. Guardar en Supabase
+    const { error } = await supabase.from('lotes').insert([
+      {
+        id_producto: nuevoLote.id_producto,
+        codigo_lote: nuevoLote.codigo_lote,
+        fecha_vencimiento: nuevoLote.fecha_vencimiento,
+        cantidad_disponible: cantidadFinal,
+      },
+    ]);
 
     if (error) {
       console.error('Error al registrar lote:', error.message);
       return { success: false, message: `Error en la base de datos: ${error.message}` };
     }
 
-    return { success: true, message: '✅ Lote de inventario registrado con éxito.' };
+    const mensajeConv = prod.unidad_medida !== 'CAJA'
+      ? ` (${nuevoLote.cantidad_ingresada} cajas × ${prod.unidades_por_caja} ${prod.unidad_medida.toLowerCase()}s)`
+      : '';
+
+    return {
+      success: true,
+      message: `✅ Lote registrado. ${cantidadFinal} unidades base en inventario${mensajeConv}.`,
+    };
   } catch (err) {
     console.error('Error de servidor en registrarNuevoLote:', err);
     return { success: false, message: 'Error inesperado al registrar el lote.' };
@@ -101,24 +126,136 @@ export async function registrarNuevoLote(nuevoLote: {
 }
 
 /**
- * 3. Procesa el despacho de una cotización aplicando el algoritmo de salida FIFO
+ * 3. Procesa el despacho de una cotización aplicando el algoritmo FIFO.
+ * 🔥 Llama a la función RPC de Supabase que hace todo en una transacción:
+ *    - Valida stock
+ *    - Descuenta de lotes más antiguos
+ *    - Crea orden de despacho
+ *    - Registra trazabilidad
+ *    - Cambia estado a APROBADO_DESPACHO
  */
 export async function procesarDespachoCotizacionFIFO(
   idCotizacion: string
-): Promise<{ success: boolean; message: string }> {
+): Promise<{ success: boolean; message: string; id_orden?: string }> {
   try {
-    // Actualizar estado de la cotización a DESPACHADA
-    const { error } = await supabase
-      .from('cotizaciones')
-      .update({ estado: 'DESPACHADA' })
-      .eq('id_cotizacion', idCotizacion);
+    const { data, error } = await supabase.rpc('procesar_despacho_fifo', {
+      p_cotizacion_id: idCotizacion,
+    });
 
     if (error) {
-      return { success: false, message: `Error al actualizar cotización: ${error.message}` };
+      return { success: false, message: error.message };
     }
 
-    return { success: true, message: '✅ Cotización despachada correctamente en modo FIFO.' };
-  } catch (err) {
+    return {
+      success: true,
+      id_orden: data?.id_orden,
+      message: `✅ Despacho FIFO procesado. Orden: ${data?.numero_orden}`,
+    };
+  } catch (err: any) {
+    console.error('Error de servidor en procesarDespachoCotizacionFIFO:', err);
     return { success: false, message: 'Error de servidor al procesar el despacho.' };
+  }
+}
+
+/**
+ * 4. Obtiene la lista de órdenes de despacho generadas (para facturación)
+ */
+export async function obtenerOrdenesProcesadas(): Promise<OrdenDespachoEntity[]> {
+  try {
+    const { data, error } = await supabase
+      .from('ordenes_despacho')
+      .select(`
+        *,
+        cotizaciones (
+          id_cotizacion,
+          numero_cotizacion,
+          cliente_tipo,
+          cliente_nombre,
+          total
+        )
+      `)
+      .eq('estado', 'PROCESADO')
+      .order('fecha_despacho', { ascending: false });
+
+    if (error) {
+      console.error('Error al consultar órdenes de despacho:', error.message);
+      return [];
+    }
+
+    return (data || []).map((o: any) => ({
+      ...o,
+      cotizaciones: o.cotizaciones || null,
+    }));
+  } catch (err) {
+    console.error('Error imprevisto en obtenerOrdenesProcesadas:', err);
+    return [];
+  }
+}
+
+/**
+ * 5. Obtiene el Picking List (qué lotes sacar físicamente) de una orden
+ */
+export async function obtenerPickingList(idOrden: string) {
+  try {
+    const { data, error } = await supabase
+      .from('despacho_lotes_detalles')
+      .select(`
+        id_despacho_detalle,
+        cantidad_descontada,
+        lotes (
+          id_lote,
+          codigo_lote,
+          fecha_vencimiento,
+          productos (item_code, nombre)
+        )
+      `)
+      .eq('id_orden', idOrden);
+
+    if (error) {
+      console.error('Error al obtener picking list:', error.message);
+      return [];
+    }
+
+    return data || [];
+  } catch (err) {
+    console.error('Error en obtenerPickingList:', err);
+    return [];
+  }
+}
+
+export async function ajustarStockLote(
+  id_lote: string, 
+  cantidad_real: number, 
+  motivo: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    // 1. Obtener la cantidad actual en el sistema
+    const { data: lote, error: errGet } = await supabase
+      .from('lotes')
+      .select('cantidad_disponible, codigo_lote')
+      .eq('id_lote', id_lote)
+      .single();
+
+    if (errGet || !lote) throw new Error('Lote no encontrado');
+
+    const diferencia = cantidad_real - lote.cantidad_disponible;
+
+    // 2. Actualizar el stock en la BD
+    const { error: errUpdate } = await supabase
+      .from('lotes')
+      .update({ cantidad_disponible: cantidad_real })
+      .eq('id_lote', id_lote);
+
+    if (errUpdate) throw errUpdate;
+
+    // 3. Registrar el ajuste (opcional: podrías crear una tabla de auditoría para esto)
+    console.log(`Ajuste en lote ${lote.codigo_lote}: ${diferencia} cajas. Motivo: ${motivo}`);
+
+    return { 
+      success: true, 
+      message: `✅ Lote ${lote.codigo_lote} ajustado. Diferencia: ${diferencia} cajas.` 
+    };
+  } catch (err: any) {
+    return { success: false, message: `❌ Error: ${err.message}` };
   }
 }

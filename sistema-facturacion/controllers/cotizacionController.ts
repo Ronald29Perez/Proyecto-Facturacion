@@ -1,20 +1,22 @@
 // ============================================================================
 // CONTROLADOR DE COTIZACIONES Y RECEPCIÓN DESDE EL CARRITO LOCAL
 // Ubicación: controllers/cotizacionController.ts
+// BD: v3.1 — incluye datos de entrega (teléfono y dirección)
 // ============================================================================
 
 import { supabase } from '../lib/supabase';
-import { ResumenCarrito } from '../models/agrolactec';
-import { CotizacionEntity } from '../models/agrolactec';
+import { ResumenCarrito, CotizacionEntity } from '../models/agrolactec';
 
 /**
- * Guarda en Supabase la cotización confirmada desde la memoria local del carrito
+ * Guarda en Supabase la cotización confirmada desde la memoria local del carrito.
+ * Incluye los datos de entrega (teléfono/dirección) en el campo `datos_entrega`.
  */
 export async function crearCotizacionDesdeCarrito(
   carrito: ResumenCarrito,
   clienteNombre: string,
   clienteTipo: 'B2B_COMERCIO' | 'B2C_HOGAR',
-  idClienteB2B?: string
+  idCliente?: string,
+  datosEntrega?: string // 🔥 NUEVO: JSON con teléfono y dirección
 ): Promise<{ success: boolean; message: string; numero_cotizacion?: string }> {
   try {
     if (carrito.items.length === 0) {
@@ -31,11 +33,12 @@ export async function crearCotizacionDesdeCarrito(
           numero_cotizacion: numeroCotizacion,
           cliente_tipo: clienteTipo,
           cliente_nombre: clienteNombre,
-          id_cliente_b2b: idClienteB2B || null,
+          id_cliente: idCliente || null,
           subtotal: carrito.subtotal,
           impuesto_iva: carrito.impuesto_iva,
           total: carrito.total,
           estado: 'PENDIENTE',
+          datos_entrega: datosEntrega || null, // 🔥 GUARDAMOS EL JSON AQUÍ
         },
       ])
       .select()
@@ -73,7 +76,8 @@ export async function crearCotizacionDesdeCarrito(
 }
 
 /**
- * Obtiene todas las cotizaciones pendientes de despachar por Bodega
+ * Obtiene todas las cotizaciones pendientes de despachar por Bodega.
+ * Incluye datos del cliente y el JSON de entrega.
  */
 export async function obtenerCotizacionesPendientes(): Promise<CotizacionEntity[]> {
   try {
@@ -81,9 +85,11 @@ export async function obtenerCotizacionesPendientes(): Promise<CotizacionEntity[
       .from('cotizaciones')
       .select(`
         *,
-        cotizacion_detalles (*)
+        cotizacion_detalles (*),
+        clientes (nombre, nit, nrc, telefono, razon_social)
       `)
-      .eq('estado', 'PENDIENTE')
+      // 🔥 AQUÍ EL CAMBIO: Ahora trae PENDIENTES y PAGADAS
+      .in('estado', ['PENDIENTE', 'PAGADO'])
       .order('fecha_emision', { ascending: false });
 
     if (error) {
@@ -94,6 +100,7 @@ export async function obtenerCotizacionesPendientes(): Promise<CotizacionEntity[
     return (data || []).map((c: any) => ({
       ...c,
       detalles: c.cotizacion_detalles || [],
+      clientes: c.clientes || null,
     }));
   } catch (err) {
     console.error('Error imprevisto en obtenerCotizacionesPendientes:', err);

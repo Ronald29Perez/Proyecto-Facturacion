@@ -1,29 +1,35 @@
 // ============================================================================
-// PÁGINA PRINCIPAL / DASHBOARD CENTRAL - ERP AGROLACTEC (COMPLETO Y CORREGIDO)
+// PÁGINA PRINCIPAL / DASHBOARD CENTRAL - ERP AGROLACTEC
 // Ubicación: app/page.tsx
+// BD: v3.6 — Dashboard Integrado + RBAC
 // ============================================================================
 
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
+import { 
+  ShoppingCart, FileText, Package, Zap, Receipt, Users, 
+  BarChart3, Map, LogOut, RefreshCw, Loader2, ShieldAlert, LayoutDashboard 
+} from 'lucide-react';
 
 // ----------------------------------------------------------------------------
-// 1. IMPORTACIÓN DE CONEXIÓN Y MODELOS
+// 1. MODELOS
 // ----------------------------------------------------------------------------
-import { supabase } from '../lib/supabase';
 import {
-  ProductoEstructurado,
-  Categoria,
-  Proveedor,
+  ProductoEntity,
+  CategoriaEntity,
+  SubcategoriaEntity,
+  ProveedorEntity,
   LoteEntity,
   CotizacionEntity,
   OrdenDespachoEntity,
-  CuentaBancaria,
+  CuentaBancariaEntity,
   Usuario,
 } from '../models/agrolactec';
 
 // ----------------------------------------------------------------------------
-// 2. IMPORTACIÓN DE COMPONENTES DE INTERFAZ (VISTAS DEL ERP)
+// 2. COMPONENTES
 // ----------------------------------------------------------------------------
 import LoginForm from '../components/auth/LoginForm';
 import CatalogoCliente from '../components/catalogo/CatalogoCliente';
@@ -33,14 +39,18 @@ import OrdenDespacho from '../components/despacho/OrdenDespacho';
 import ComprobanteFiscal from '../components/facturacion/ComprobanteFiscal';
 import GestionUsuarios from '../components/usuarios/GestionUsuarios';
 import VistaClientePedido from '../components/cliente/VistaClientePedido';
+import HistorialReportes from '../components/reportes/HistorialReportes';
+import MonitoreoRuta from '../components/rutas/MonitoreoRuta';
+import DashboardAdmin from '../components/dashboard/DashboardAdmin'; // 🔥 NUEVO
 
 // ----------------------------------------------------------------------------
-// 3. IMPORTACIÓN DE CONTROLADORES DE NEGOCIO
+// 3. CONTROLADORES
 // ----------------------------------------------------------------------------
-import { obtenerUsuarioActual, cerrarSesion } from '../controllers/authController';
+import { cargarSesion, guardarSesion, cerrarSesion, SesionUsuario } from '../controllers/authController';
 
 import {
   obtenerCategorias,
+  obtenerSubcategorias,
   obtenerProveedores,
   obtenerProductosCatalogo,
 } from '../controllers/productoController';
@@ -61,63 +71,79 @@ import {
 
 import { obtenerUsuarios } from '../controllers/usuarioController';
 
+import { 
+  obtenerHistorialCotizaciones, 
+  obtenerHistorialDespachos, 
+  obtenerHistorialFacturas,
+  obtenerInventarioValorizado
+} from '../controllers/reporteController';
+
+import { obtenerDatosDashboard } from '../controllers/dashboardController'; // 🔥 NUEVO
+
+type TabActiva =
+  | 'DASHBOARD'
+  | 'CATALOGO'
+  | 'PRODUCTOS'
+  | 'LOTES'
+  | 'DESPACHO'
+  | 'FACTURACION'
+  | 'USUARIOS'
+  | 'REPORTES'
+  | 'RUTAS';
+
+const TABS_PERMITIDAS: Record<string, string[]> = {
+  ADMINISTRADOR: ['DASHBOARD', 'CATALOGO', 'PRODUCTOS', 'LOTES', 'DESPACHO', 'FACTURACION', 'USUARIOS', 'REPORTES', 'RUTAS'],
+  GERENTE:       ['DASHBOARD', 'LOTES', 'DESPACHO', 'FACTURACION', 'REPORTES', 'RUTAS'],
+  BODEGA:        ['LOTES', 'DESPACHO', 'RUTAS', 'REPORTES'],
+  CAJERO:        ['FACTURACION', 'REPORTES'],
+  VENDEDOR:      ['CATALOGO', 'LOTES', 'REPORTES'],
+  CLIENTE:       [],
+};
+
 export default function ERPDashboardPage() {
-  // --------------------------------------------------------------------------
-  // ESTADOS DE AUTENTICACIÓN Y NAVEGACIÓN
-  // --------------------------------------------------------------------------
-  const [usuarioActivo, setUsuarioActivo] = useState<Usuario | null>(null);
-  const [verificandoSesion, setVerificandoSesion] = useState<boolean>(true);
+  const [usuarioActivo, setUsuarioActivo] = useState<SesionUsuario | null>(null);
+  const [verificandoSesion, setVerificandoSesion] = useState(true);
 
-  const [tabActiva, setTabActiva] = useState<
-    'CATALOGO' | 'REGISTRO_PRODUCTO' | 'LOTES' | 'DESPACHO' | 'FACTURACION' | 'USUARIOS'
-  >('CATALOGO');
-
-  // --------------------------------------------------------------------------
-  // ESTADOS DE DATOS DEL ERP (ALMACENAMIENTO EN MEMORIA)
-  // --------------------------------------------------------------------------
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
-  const [productos, setProductos] = useState<ProductoEstructurado[]>([]);
+  const [categorias, setCategorias] = useState<CategoriaEntity[]>([]);
+  const [subcategorias, setSubcategorias] = useState<SubcategoriaEntity[]>([]);
+  const [proveedores, setProveedores] = useState<ProveedorEntity[]>([]);
+  const [productos, setProductos] = useState<ProductoEntity[]>([]);
   const [lotes, setLotes] = useState<LoteEntity[]>([]);
   const [cotizacionesPendientes, setCotizacionesPendientes] = useState<CotizacionEntity[]>([]);
   const [ordenesPorFacturar, setOrdenesPorFacturar] = useState<OrdenDespachoEntity[]>([]);
-  const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([]);
+  const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancariaEntity[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
-  const [cargando, setCargando] = useState<boolean>(false);
+  
+  const [historialCotizaciones, setHistorialCotizaciones] = useState<any[]>([]);
+  const [historialDespachos, setHistorialDespachos] = useState<any[]>([]);
+  const [historialFacturas, setHistorialFacturas] = useState<any[]>([]);
+  
+  const [dashboardData, setDashboardData] = useState<any>(null); // 🔥 NUEVO
+  const [inventario, setInventario] = useState<any[]>([]);
+  const [valorTotalBodega, setValorTotalBodega] = useState(0);
+  const [totalCajas, setTotalCajas] = useState(0);
+  const [cargando, setCargando] = useState(false);
 
-  // --------------------------------------------------------------------------
-  // EFECTO INICIAL: COMPROBACIÓN DE SESIÓN Y CARGA DE DATOS
-  // --------------------------------------------------------------------------
+  const [tabActiva, setTabActiva] = useState<TabActiva>('DASHBOARD'); // 🔥 Iniciamos en Dashboard
+
   useEffect(() => {
-    async function chequearSesion() {
-      const usr = await obtenerUsuarioActual();
-      setUsuarioActivo(usr);
-      setVerificandoSesion(false);
-
-      if (usr) {
-        await cargarDatosServidor();
-      }
+    const sesion = cargarSesion();
+    setUsuarioActivo(sesion);
+    setVerificandoSesion(false);
+    if (sesion) {
+      cargarDatosServidor();
     }
-    chequearSesion();
   }, []);
 
-  /**
-   * Carga sincrónica y en paralelo de todas las entidades del ERP desde Supabase
-   */
   const cargarDatosServidor = async () => {
     setCargando(true);
     try {
       const [
-        cats,
-        provs,
-        prods,
-        lots,
-        cots,
-        ords,
-        ctas,
-        usrs,
+        cats, subs, provs, prods, lots, cots, ords, ctas, usrs,
+        histCots, histDesps, histFacs, dData, dataInventario
       ] = await Promise.all([
         obtenerCategorias(),
+        obtenerSubcategorias(),
         obtenerProveedores(),
         obtenerProductosCatalogo(),
         obtenerLotesOrdenadosFIFO(),
@@ -125,10 +151,15 @@ export default function ERPDashboardPage() {
         obtenerOrdenesPorFacturar(),
         obtenerCuentasBancarias(),
         obtenerUsuarios(),
+        obtenerHistorialCotizaciones(),
+        obtenerHistorialDespachos(),
+        obtenerHistorialFacturas(),
+        obtenerDatosDashboard(), 
+        obtenerInventarioValorizado(),// 🔥 NUEVO
       ]);
 
-      // Actualización masiva del estado de React
       setCategorias(cats || []);
+      setSubcategorias(subs || []);
       setProveedores(provs || []);
       setProductos(prods || []);
       setLotes(lots || []);
@@ -136,34 +167,45 @@ export default function ERPDashboardPage() {
       setOrdenesPorFacturar(ords || []);
       setCuentasBancarias(ctas || []);
       setUsuarios(usrs || []);
+      
+      setHistorialCotizaciones(histCots || []);
+      setHistorialDespachos(histDesps || []);
+      setHistorialFacturas(histFacs || []);
+      
+      setDashboardData(dData); // 🔥 NUEVO
+      setInventario(dataInventario.inventario || []);
+      setValorTotalBodega(dataInventario.valorTotalBodega || 0);
+      setTotalCajas(dataInventario.totalCajas || 0);
     } catch (error) {
-      console.error('Error al sincronizar datos con el servidor:', error);
+      console.error('Error al sincronizar datos:', error);
     } finally {
       setCargando(false);
     }
   };
 
-  // --------------------------------------------------------------------------
-  // MANEJADORES DE ACCIONES Y EVENTOS DEL USUARIO
-  // --------------------------------------------------------------------------
-  const handleLogout = async () => {
-    await cerrarSesion();
+  const handleLogout = () => {
+    cerrarSesion();
     setUsuarioActivo(null);
+  };
+
+  const handleLoginExitoso = async (usr: SesionUsuario) => {
+    guardarSesion(usr);
+    setUsuarioActivo(usr);
+    // Si es gerente o admin, que inicie en Dashboard
+    setTabActiva(usr.rol === 'ADMINISTRADOR' || usr.rol === 'GERENTE' ? 'DASHBOARD' : 'CATALOGO');
+    await cargarDatosServidor();
   };
 
   const handleGuardarLote = async (nuevoLote: {
     id_producto: string;
     codigo_lote: string;
     fecha_vencimiento: string;
-    cajas_ingresadas: number;
-    unidades_disponibles: number;
+    cantidad_ingresada: number;
   }) => {
     const res = await registrarNuevoLote(nuevoLote);
+    alert(res.message);
     if (res.success) {
-      alert(res.message);
       await cargarDatosServidor();
-    } else {
-      alert(`Error: ${res.message}`);
     }
   };
 
@@ -175,269 +217,202 @@ export default function ERPDashboardPage() {
     return res;
   };
 
-  const handleGenerarComprobante = async (datosComprobante: any) => {
-    const res = await emitirComprobanteFiscal(datosComprobante);
+  const handleGenerarComprobante = async (datos: {
+    id_orden: string;
+    tipo_comprobante: 'FACTURA_CONSUMIDOR_FINAL' | 'CREDITO_FISCAL';
+    condicion_pago: 'CONTADO' | 'CREDITO_15_DIAS' | 'CREDITO_30_DIAS';
+    metodo_pago: 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA';
+    id_cuenta_bancaria?: string;
+    numero_comprobante?: string;
+  }) => {
+    const res = await emitirComprobanteFiscal(datos);
     if (res.success) {
       await cargarDatosServidor();
     }
     return res;
   };
 
-  // --------------------------------------------------------------------------
-  // RENDERIZADO CONDICIONAL 1: PANTALLA DE CARGA INICIAL
-  // --------------------------------------------------------------------------
+  // 1. Pantalla de carga inicial
   if (verificandoSesion) {
     return (
-      <div style={{ textAlign: 'center', padding: '50px', fontFamily: 'system-ui' }}>
-        <h2>🧀 Cargando AgroLactec ERP...</h2>
-        <p style={{ color: '#64748b' }}>Verificando credenciales de acceso...</p>
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9', fontFamily: 'system-ui' }}>
+        <Image 
+  src="/img/logo-agrolactec.png" 
+  alt="AgroLactec Logo" 
+  width={140} 
+  height={40} 
+  priority={true} // 🔥 Le dice a Next.js que cargue esta imagen de inmediato
+/>
+        <Loader2 size={40} color="#0284c7" className="animate-spin" style={{ marginBottom: '15px' }} />
+        <h2 style={{ margin: 0, color: '#1e293b', fontSize: '1.2rem' }}>Cargando Sistema...</h2>
+        <p style={{ margin: '8px 0 0 0', color: '#64748b', fontSize: '0.9rem' }}>Verificando credenciales y sincronizando datos</p>
       </div>
     );
   }
 
-  // --------------------------------------------------------------------------
-  // RENDERIZADO CONDICIONAL 2: FORMULARIO DE INICIO DE SESIÓN
-  // --------------------------------------------------------------------------
+  // 2. Login
   if (!usuarioActivo) {
+    return <LoginForm onLoginExitoso={handleLoginExitoso} />;
+  }
+
+  // 3. Portal del Cliente
+  if (usuarioActivo.rol === 'CLIENTE') {
     return (
-      <LoginForm
-        onLoginExitoso={async (usr) => {
-          setUsuarioActivo(usr);
-          await cargarDatosServidor();
+      <VistaClientePedido
+        usuario={{
+          id_usuario: usuarioActivo.id_usuario,
+          nombre_completo: usuarioActivo.nombre_completo,
+          username: usuarioActivo.username,
+          password_hash: '',
+          rol: usuarioActivo.rol,
+          activo: usuarioActivo.activo,
         }}
+        productos={productos}
+        categorias={categorias}
+        onCerrarSesion={handleLogout}
       />
     );
   }
 
-// CONDICIONAL ROL CLIENTE EXCLUSIVO
-if (usuarioActivo.rol?.nombre_rol?.toLowerCase() === 'cliente') {
-  return (
-    <VistaClientePedido
-      usuario={usuarioActivo}
-      productos={productos}
-      categorias={categorias}
-      onCerrarSesion={handleLogout}
-    />
-  );
-}
+  // 4. Pantalla de carga POST-login
+  if (cargando) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9', fontFamily: 'system-ui' }}>
+        <Image src="/img/logo-agrolactec.png" alt="AgroLactec Logo" width={180} height={70} style={{ objectFit: 'contain', marginBottom: '20px' }} />
+        <Loader2 size={40} color="#0284c7" className="animate-spin" style={{ marginBottom: '15px' }} />
+        <h2 style={{ margin: 0, color: '#1e293b', fontSize: '1.2rem' }}>Bienvenido</h2>
+        <p style={{ margin: '8px 0 0 0', color: '#64748b', fontSize: '0.9rem' }}>Preparando tu panel de control...</p>
+      </div>
+    );
+  }
 
-  // --------------------------------------------------------------------------
-  // RENDERIZADO PRINCIPAL: PANEL DERECHO Y PESTAÑAS DEL ERP
-  // --------------------------------------------------------------------------
+  // 5. Menú de Pestañas con Iconos
+  const tabsVisibles = [
+    { key: 'DASHBOARD', label: 'Inicio', icon: <LayoutDashboard size={18} /> }, // 🔥 NUEVO
+    { key: 'CATALOGO', label: 'Catálogo', icon: <ShoppingCart size={18} /> },
+    { key: 'PRODUCTOS', label: 'Ficha de Producto', icon: <FileText size={18} /> },
+    { key: 'LOTES', label: 'Entradas Bodega', icon: <Package size={18} /> },
+    { key: 'DESPACHO', label: `Despacho FIFO (${cotizacionesPendientes.length})`, icon: <Zap size={18} /> },
+    { key: 'FACTURACION', label: `Facturación (${ordenesPorFacturar.length})`, icon: <Receipt size={18} /> },
+    { key: 'USUARIOS', label: `Usuarios (${usuarios.length})`, icon: <Users size={18} /> },
+    { key: 'REPORTES', label: 'Reportes', icon: <BarChart3 size={18} /> },
+    { key: 'RUTAS', label: 'Rutas', icon: <Map size={18} /> },
+  ].filter(tab => TABS_PERMITIDAS[usuarioActivo.rol]?.includes(tab.key));
+
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', backgroundColor: '#f1f5f9', minHeight: '100vh', padding: '20px' }}>
-      {/* ENCABEZADO SUPERIOR CON INFORMACIÓN DE USUARIO Y LOGOUT */}
-      <header
-        style={{
-          backgroundColor: '#1e293b',
-          color: '#ffffff',
-          padding: '20px',
-          borderRadius: '10px',
-          marginBottom: '20px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
-        }}
-      >
-        <div>
-          <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#38bdf8' }}>🧀 AgroLactec ERP</h1>
-          <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#94a3b8' }}>
-            Usuario: <strong>{usuarioActivo.nombre_completo}</strong> ({usuarioActivo.rol?.nombre_rol || 'Usuario'})
-          </p>
+      
+      {/* HEADER */}
+      <header style={{ backgroundColor: '#1e293b', color: '#ffffff', padding: '20px', borderRadius: '10px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <div style={{ width: '140px', height: '40px', position: 'relative' }}>
+            <Image src="/img/logo-agrolactec.png" alt="AgroLactec Logo" fill style={{ objectFit: 'contain', objectPosition: 'left' }} />
+          </div>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#38bdf8' }}>AgroLactec ERP</h1>
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: '#94a3b8' }}>
+              Usuario: <strong>{usuarioActivo.nombre_completo}</strong> ({usuarioActivo.rol})
+            </p>
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button
-            onClick={cargarDatosServidor}
-            disabled={cargando}
-            style={{
-              backgroundColor: '#0284c7',
-              color: '#fff',
-              border: 'none',
-              padding: '8px 16px',
-              borderRadius: '6px',
-              cursor: cargando ? 'not-allowed' : 'pointer',
-              fontWeight: 'bold',
-              fontSize: '0.85rem',
-            }}
-          >
-            {cargando ? '🔄 Sincronizando...' : '🔄 Recargar Datos'}
+          <button onClick={cargarDatosServidor} disabled={cargando} style={{ backgroundColor: '#0284c7', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: cargando ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <RefreshCw size={16} /> Recargar Datos
           </button>
-          <button
-            onClick={handleLogout}
-            style={{
-              backgroundColor: '#ef4444',
-              color: '#fff',
-              border: 'none',
-              padding: '8px 16px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              fontSize: '0.85rem',
-            }}
-          >
-            🚪 Cerrar Sesión
+          <button onClick={handleLogout} style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <LogOut size={16} /> Cerrar Sesión
           </button>
         </div>
       </header>
 
-      {/* BARRA DE NAVEGACIÓN POR PESTAÑAS (TABS) */}
-      <nav
-        style={{
-          display: 'flex',
-          gap: '10px',
-          marginBottom: '20px',
-          backgroundColor: '#ffffff',
-          padding: '8px',
-          borderRadius: '8px',
-          border: '1px solid #cbd5e1',
-          overflowX: 'auto',
-        }}
-      >
-        <button
-          onClick={() => setTabActiva('CATALOGO')}
-          style={{
-            padding: '10px 16px',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            fontSize: '0.85rem',
-            backgroundColor: tabActiva === 'CATALOGO' ? '#2563eb' : 'transparent',
-            color: tabActiva === 'CATALOGO' ? '#ffffff' : '#64748b',
-          }}
-        >
-          🛍️ Catálogo y Carrito
-        </button>
-
-        <button
-          onClick={() => setTabActiva('REGISTRO_PRODUCTO')}
-          style={{
-            padding: '10px 16px',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            fontSize: '0.85rem',
-            backgroundColor: tabActiva === 'REGISTRO_PRODUCTO' ? '#2563eb' : 'transparent',
-            color: tabActiva === 'REGISTRO_PRODUCTO' ? '#ffffff' : '#64748b',
-          }}
-        >
-          📝 Ficha de Producto
-        </button>
-
-        <button
-          onClick={() => setTabActiva('LOTES')}
-          style={{
-            padding: '10px 16px',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            fontSize: '0.85rem',
-            backgroundColor: tabActiva === 'LOTES' ? '#2563eb' : 'transparent',
-            color: tabActiva === 'LOTES' ? '#ffffff' : '#64748b',
-          }}
-        >
-          📦 Entradas Bodega (Lotes)
-        </button>
-
-        <button
-          onClick={() => setTabActiva('DESPACHO')}
-          style={{
-            padding: '10px 16px',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            fontSize: '0.85rem',
-            backgroundColor: tabActiva === 'DESPACHO' ? '#2563eb' : 'transparent',
-            color: tabActiva === 'DESPACHO' ? '#ffffff' : '#64748b',
-          }}
-        >
-          ⚡ Despacho FIFO ({cotizacionesPendientes.length})
-        </button>
-
-        <button
-          onClick={() => setTabActiva('FACTURACION')}
-          style={{
-            padding: '10px 16px',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            fontSize: '0.85rem',
-            backgroundColor: tabActiva === 'FACTURACION' ? '#2563eb' : 'transparent',
-            color: tabActiva === 'FACTURACION' ? '#ffffff' : '#64748b',
-          }}
-        >
-          🧾 Facturación & Cobro ({ordenesPorFacturar.length})
-        </button>
-
-        <button
-          onClick={() => setTabActiva('USUARIOS')}
-          style={{
-            padding: '10px 16px',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            fontSize: '0.85rem',
-            backgroundColor: tabActiva === 'USUARIOS' ? '#2563eb' : 'transparent',
-            color: tabActiva === 'USUARIOS' ? '#ffffff' : '#64748b',
-          }}
-        >
-          👥 Gestión de Usuarios ({usuarios.length})
-        </button>
+      {/* NAVEGACIÓN */}
+      <nav style={{ display: 'flex', gap: '10px', marginBottom: '20px', backgroundColor: '#ffffff', padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto' }}>
+        {tabsVisibles.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setTabActiva(tab.key as TabActiva)}
+            style={{
+              padding: '10px 16px',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '0.85rem',
+              whiteSpace: 'nowrap',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              backgroundColor: tabActiva === tab.key ? '#2563eb' : 'transparent',
+              color: tabActiva === tab.key ? '#ffffff' : '#64748b',
+              transition: 'all 0.2s'
+            }}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
       </nav>
 
-      {/* ÁREA DE CONTENIDO DINÁMICO SEGÚN PESTAÑA ACTIVA */}
+      {/* CONTENIDO */}
       <main style={{ backgroundColor: '#ffffff', borderRadius: '10px', padding: '15px', border: '1px solid #cbd5e1' }}>
-        {tabActiva === 'CATALOGO' && (
-          <CatalogoCliente
-            productos={productos.filter((p) => p.activo !== false)}
-            categorias={categorias}
-          />
-        )}
+        {!TABS_PERMITIDAS[usuarioActivo.rol]?.includes(tabActiva) ? (
+          <div style={{ textAlign: 'center', padding: '50px', color: '#ef4444' }}>
+            <ShieldAlert size={48} style={{ margin: '0 auto 16px' }} />
+            <h2>Acceso Denegado</h2>
+            <p>Tu rol ({usuarioActivo.rol}) no tiene permisos para ver este módulo.</p>
+          </div>
+        ) : (
+          <>
+            {/* 🔥 RENDERIZADO DEL DASHBOARD */}
+            {tabActiva === 'DASHBOARD' && (
+              <DashboardAdmin datos={dashboardData} />
+            )}
 
-        {tabActiva === 'REGISTRO_PRODUCTO' && (
-          <RegistroProducto
-            productos={productos}
-            categorias={categorias}
-            proveedores={proveedores}
-            onRefrescarDatos={cargarDatosServidor}
-          />
-        )}
+            {tabActiva === 'CATALOGO' && (
+              <VistaClientePedido
+                usuario={{
+                  id_usuario: usuarioActivo.id_usuario,
+                  nombre_completo: usuarioActivo.nombre_completo,
+                  username: usuarioActivo.username,
+                  password_hash: '',
+                  rol: usuarioActivo.rol,
+                  activo: usuarioActivo.activo,
+                }}
+                productos={productos}
+                categorias={categorias}
+                onCerrarSesion={() => {}} 
+              />
+            )}
 
-        {tabActiva === 'LOTES' && (
-          <GestionLotes
-            productos={productos}
-            lotes={lotes}
-            onGuardarLote={handleGuardarLote}
-          />
-        )}
+            {tabActiva === 'PRODUCTOS' && (
+              <RegistroProducto productos={productos} categorias={categorias} subcategorias={subcategorias} proveedores={proveedores} onRefrescarDatos={cargarDatosServidor} />
+            )}
 
-        {tabActiva === 'DESPACHO' && (
-          <OrdenDespacho
-            cotizacionesPendientes={cotizacionesPendientes}
-            onProcesarDespachoFIFO={handleProcesarDespachoFIFO}
-          />
-        )}
+            {tabActiva === 'LOTES' && (
+              <GestionLotes productos={productos} lotes={lotes} onGuardarLote={handleGuardarLote} />
+            )}
 
-        {tabActiva === 'FACTURACION' && (
-          <ComprobanteFiscal
-            ordenesPorFacturar={ordenesPorFacturar}
-            cuentasBancarias={cuentasBancarias}
-            onGenerarComprobante={handleGenerarComprobante}
-          />
-        )}
+            {tabActiva === 'DESPACHO' && (
+              <OrdenDespacho cotizacionesPendientes={cotizacionesPendientes} onProcesarDespachoFIFO={handleProcesarDespachoFIFO} />
+            )}
 
-        {tabActiva === 'USUARIOS' && (
-          <GestionUsuarios
-            usuarios={usuarios}
-            onRefrescarUsuarios={cargarDatosServidor}
-          />
+            {tabActiva === 'FACTURACION' && (
+              <ComprobanteFiscal ordenesPorFacturar={ordenesPorFacturar} cuentasBancarias={cuentasBancarias} onGenerarComprobante={handleGenerarComprobante} />
+            )}
+
+            {tabActiva === 'USUARIOS' && (
+              <GestionUsuarios usuarios={usuarios} onRefrescarUsuarios={cargarDatosServidor} />
+            )}
+
+            {tabActiva === 'REPORTES' && (
+              <HistorialReportes cotizaciones={historialCotizaciones} despachos={historialDespachos} facturas={historialFacturas}  inventario={inventario}  valorTotalBodega={valorTotalBodega} totalCajas={totalCajas}  rolUsuario={usuarioActivo.rol}  onRefrescar={cargarDatosServidor}  />
+            )}
+
+            {tabActiva === 'RUTAS' && (
+              <MonitoreoRuta cotizaciones={historialCotizaciones} />
+            )}
+          </>
         )}
       </main>
     </div>
