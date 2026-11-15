@@ -52,6 +52,7 @@ export default function VistaClientePedido({
   const [nrc, setNrc] = useState('');
   const [telefonoCliente, setTelefonoCliente] = useState('');
   const [direccionEntrega, setDireccionEntrega] = useState('');
+  const [emailCliente, setEmailCliente] = useState(''); // 🔥 NUEVO ESTADO
   const [enviando, setEnviando] = useState(false);
 
   // --- Estados del Flujo de Pago ---
@@ -136,11 +137,34 @@ export default function VistaClientePedido({
     e.preventDefault();
 
     if (carrito.length === 0) return alert('El carrito está vacío.');
-    if (!nombreCliente || !telefonoCliente || !direccionEntrega) return alert('Completa nombre, teléfono y dirección.');
-    if (tipoVenta === 'B2B_COMERCIO' && (!nit || !nrc || !razonSocial)) return alert('Completa los datos fiscales B2B.');
+    if (!nombreCliente || !telefonoCliente || !direccionEntrega || !emailCliente) 
+      return alert('Completa nombre, correo, teléfono y dirección.');
+    if (tipoVenta === 'B2B_COMERCIO' && (!nit || !nrc || !razonSocial)) 
+      return alert('Completa los datos fiscales B2B.');
 
     setEnviando(true);
     try {
+      // 🔥 1. GUARDAR O ACTUALIZAR EL CLIENTE EN SUPABASE
+      const { error: errorCliente } = await supabase
+        .from('clientes')
+        .upsert(
+          {
+            tipo: tipoVenta,
+            nombre: nombreCliente,
+            telefono: telefonoCliente,
+            email: emailCliente,
+            direccion: direccionEntrega,
+            // Si es B2B, también podrías guardar NIT, NRC y razon_social si tienes esas columnas
+          },
+          { onConflict: 'email' } // Asumiendo que email es único en tu tabla clientes
+        );
+
+      if (errorCliente) {
+        console.error('Error al guardar cliente:', errorCliente);
+        // No detenemos el flujo si falla el guardado del cliente, pero lo logueamos
+      }
+
+      // 2. CREAR LA COTIZACIÓN
       const subtotal = totalPedido;
       const iva = parseFloat((subtotal * 0.13).toFixed(2));
       const total = parseFloat((subtotal + iva).toFixed(2));
@@ -154,8 +178,12 @@ export default function VistaClientePedido({
       }));
 
       const resumen: ResumenCarrito = { items, subtotal, impuesto_iva: iva, total };
+      
+      // Incluimos el email en los datos de entrega JSON
       const datosEntregaJSON = JSON.stringify({
-        telefono: telefonoCliente, direccion: direccionEntrega,
+        telefono: telefonoCliente, 
+        direccion: direccionEntrega,
+        email: emailCliente,
         ...(tipoVenta === 'B2B_COMERCIO' ? { razon_social: razonSocial, nit, nrc } : {})
       });
 
@@ -222,6 +250,28 @@ export default function VistaClientePedido({
         .eq('id_cotizacion', cotDB.id_cotizacion);
 
       if (error) throw error;
+
+      // 🔥 2. ENVIAR EL TICKET POR CORREO
+      try {
+        await fetch('/api/enviar-ticket', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: emailCliente,
+            nombreCliente,
+            numeroPedido: cotizacionCreada.numero_cotizacion,
+            total: cotizacionCreada.total || totalPedido,
+            productos: carrito.map(c => ({
+              cantidad: c.cajas > 0 ? c.cajas : c.unidades,
+              nombre: c.producto.nombre,
+              precio: c.subtotal
+            }))
+          })
+        });
+      } catch (emailError) {
+        console.error('Error enviando correo:', emailError);
+        // No detenemos el pago si falla el correo, solo avisamos en consola
+      }
 
       alert('✅ ¡Pago procesado con éxito! Revisa el estado de tu pedido en "Mis Pedidos".');
       
@@ -393,6 +443,11 @@ export default function VistaClientePedido({
                       </div>
                     </>
                   )}
+
+                  <div>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#475569' }}>Correo Electrónico *</label>
+                    <input type="email" required value={emailCliente} onChange={(e) => setEmailCliente(e.target.value)} placeholder="ejemplo@correo.com" style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
+                  </div>
 
                   <div>
                     <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#475569' }}>Teléfono *</label>
@@ -629,7 +684,7 @@ export default function VistaClientePedido({
                         <strong style={{ color: '#0284c7', fontSize: '1.1rem' }}>{pedido.numero_cotizacion}</strong>
                         <span style={{ fontSize: '0.8rem', color: '#94a3b8', marginLeft: '10px' }}>{new Date(pedido.fecha_emision).toLocaleDateString()}</span>
 
-                        {/* 🔥 NUEVO: Fecha estimada de entrega */}
+                        {/* 🔥 Fecha estimada de entrega */}
                         <div style={{ marginTop: '10px', padding: '8px 12px', backgroundColor: '#eff6ff', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                           <Truck size={16} color="#0284c7" />
                           <span style={{ fontSize: '0.85rem', color: '#1e3a8a' }}>
