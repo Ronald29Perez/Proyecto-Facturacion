@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import { iniciarSesion, SesionUsuario } from '../../controllers/authController';
 import Image from 'next/image';
-import { Lock, Loader2 } from 'lucide-react';
+import { Lock, Loader2, ShoppingBag, ShieldAlert } from 'lucide-react'; // 🔥 Agregamos iconos
 
 interface Props {
   onLoginExitoso: (usuario: SesionUsuario) => void | Promise<void>;
@@ -36,6 +36,13 @@ export default function LoginForm({ onLoginExitoso }: Props) {
     setCargando(false);
   };
 
+  // 🔥 FUNCIÓN PARA LLENAR DATOS AUTOMÁTICAMENTE
+  const llenarCredenciales = (user: string, pass: string) => {
+    setUsername(user);
+    setPassword(pass);
+    setError(''); // Limpiamos errores por si acaso
+  };
+
   return (
     <div
       style={{
@@ -56,7 +63,7 @@ export default function LoginForm({ onLoginExitoso }: Props) {
           borderRadius: '12px',
           boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
           width: '100%',
-          maxWidth: '400px',
+          maxWidth: '420px',
           display: 'flex',
           flexDirection: 'column',
           gap: '16px',
@@ -122,7 +129,7 @@ export default function LoginForm({ onLoginExitoso }: Props) {
           </div>
         )}
 
-        {/* BOTÓN */}
+        {/* BOTÓN LOGIN */}
         <button
           type="submit"
           disabled={cargando}
@@ -136,16 +143,16 @@ export default function LoginForm({ onLoginExitoso }: Props) {
             fontSize: '1rem',
             cursor: cargando ? 'not-allowed' : 'pointer',
             marginTop: '8px',
-            display: 'flex',           // 🔥 Alinea el icono y el texto
-            alignItems: 'center',      // 🔥 Alinea el icono y el texto
-            justifyContent: 'center',  // 🔥 Centra todo
-            gap: '8px',                // 🔥 Espacio entre el icono y el texto
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
             transition: 'background-color 0.2s'
           }}
         >
           {cargando ? (
             <>
-              <Loader2 size={20} className="animate-spin" /> {/* Icono de carga girando */}
+              <Loader2 size={20} className="animate-spin" />
               Ingresando...
             </>
           ) : (
@@ -155,6 +162,45 @@ export default function LoginForm({ onLoginExitoso }: Props) {
             </>
           )}
         </button>
+
+        {/* 🔥 SECCIÓN DE ACCESO RÁPIDO PARA LA DEMO */}
+        <div style={{ marginTop: '15px', paddingTop: '20px', borderTop: '1px solid #e2e8f0' }}>
+          <p style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center', marginBottom: '12px', fontWeight: 'bold' }}>
+            Acceso rápido para la demostración:
+          </p>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            
+            {/* Botón Cliente */}
+            <button
+              type="button"
+              onClick={() => llenarCredenciales('cliente_demo', '123456')}
+              style={{
+                flex: 1, backgroundColor: '#0284c7', color: '#fff', border: 'none',
+                padding: '10px 8px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                fontSize: '0.75rem'
+              }}
+            >
+              <ShoppingBag size={16} /> Cliente
+            </button>
+
+            {/* Botón Admin */}
+            <button
+              type="button"
+              onClick={() => llenarCredenciales('admin', 'admin123')} // Ajusta con tus credenciales de admin
+              style={{
+                flex: 1, backgroundColor: '#0f172a', color: '#fff', border: 'none',
+                padding: '10px 8px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                fontSize: '0.75rem'
+              }}
+            >
+              <ShieldAlert size={16} /> Administrador
+            </button>
+
+          </div>
+        </div>
+
       </form>
     </div>
   );
