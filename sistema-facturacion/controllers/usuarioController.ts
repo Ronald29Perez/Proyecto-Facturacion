@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase';
 import { Usuario, RolUsuario } from '../models/agrolactec';
 
 const ROLES_VALIDOS: RolUsuario[] = [
-  'ADMINISTRADOR', 'GERENTE', 'BODEGA', 'CAJERO', 'VENDEDOR', 'CLIENTE',
+  'ADMINISTRADOR', 'GERENTE', 'BODEGA', 'CAJERO', 'VENDEDOR', 'MOTORISTA', 'CLIENTE',
 ];
 
 // ============================================================================

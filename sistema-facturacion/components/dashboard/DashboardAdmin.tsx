@@ -18,7 +18,7 @@ export default function DashboardAdmin({ datos }: { datos: any }) {
     return () => clearInterval(interval);
   }, []);
 
-  if (!datos) return <p style={{ padding: '20px' }}>Cargando datos del servidor...</p>;
+  if (!datos) return <p className="p-5 text-slate-500">Cargando datos del servidor...</p>;
 
   const esAlertaTemperatura = temperatura > 6;
 
@@ -36,76 +36,68 @@ export default function DashboardAdmin({ datos }: { datos: any }) {
   const dataProductos = datos.productosMasVendidos || [];
 
   const Card = ({ title, value, icon, color, subtitle }: any) => (
-    <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '15px' }}>
-      <div style={{ backgroundColor: color + '20', padding: '15px', borderRadius: '50%', color: color }}>
+    <div className="bg-white p-5 rounded-xl border border-slate-200 flex items-center gap-4 shadow-sm w-full">
+      <div className="p-4 rounded-full flex-shrink-0" style={{ backgroundColor: color + '20', color: color }}>
         {icon}
       </div>
-      <div>
-        <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: 'bold' }}>{title}</p>
-        <h2 style={{ margin: 0, fontSize: '1.5rem', color: '#0f172a' }}>{value}</h2>
-        {subtitle && <p style={{ margin: 0, fontSize: '0.75rem', color: '#94a3b8' }}>{subtitle}</p>}
+      <div className="min-w-0">
+        <p className="m-0 text-sm text-slate-500 font-bold truncate">{title}</p>
+        <h2 className="m-0 text-2xl text-slate-900 truncate">{value}</h2>
+        {subtitle && <p className="m-0 text-xs text-slate-400 truncate">{subtitle}</p>}
       </div>
     </div>
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div className="flex flex-col gap-6">
       
       {/* 🔥 BANNER DE ALERTA (Solo si la temperatura es alta) */}
       {esAlertaTemperatura && (
-        <div style={{ 
-          backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', 
-          padding: '15px 20px', borderRadius: '8px', display: 'flex', 
-          alignItems: 'center', gap: '10px', fontWeight: 'bold'
-        }}>
-          <AlertTriangle size={24} />
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg flex items-start gap-3 shadow-sm animate-pulse">
+          <AlertTriangle size={24} className="flex-shrink-0 mt-0.5" />
           <div>
-            <p style={{ margin: 0, fontSize: '1rem' }}>⚠️ ALERTA CRÍTICA DE CADENA DE FRÍO</p>
-            <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 'normal' }}>
+            <p className="m-0 font-bold text-base">⚠️ ALERTA CRÍTICA DE CADENA DE FRÍO</p>
+            <p className="m-0 text-sm font-normal mt-1">
               El sensor del camión ha detectado {temperatura} °C. Se recomienda revisar el sistema de refrigeración.
             </p>
           </div>
         </div>
       )}
 
-      {/* TARJETAS DE KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
+      {/* TARJETAS DE KPIs (1 columna en cel, 2 en tablet, 4 en PC) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <Card title="Ventas de Hoy" value={`$${datos.ventasHoy?.toFixed(2) || '0.00'}`} icon={<DollarSign size={24} />} color="#16a34a" />
         <Card title="Ventas Totales" value={`$${datos.ventasTotales?.toFixed(2) || '0.00'}`} icon={<TrendingUp size={24} />} color="#0284c7" />
         <Card title="Pedidos Pendientes" value={datos.pedidosPendientes || 0} icon={<ShoppingCart size={24} />} color="#f59e0b" subtitle="Por despachar" />
         
         {/* TARJETA DE TEMPERATURA */}
-        <div style={{ 
-          backgroundColor: esAlertaTemperatura ? '#fef2f2' : '#fff', padding: '20px', borderRadius: '10px', 
-          border: `2px solid ${esAlertaTemperatura ? '#ef4444' : '#e2e8f0'}`, display: 'flex', 
-          alignItems: 'center', gap: '15px', transition: 'all 0.3s'
-        }}>
-          <div style={{ backgroundColor: esAlertaTemperatura ? '#fee2e2' : '#dcfce7', padding: '15px', borderRadius: '50%', color: esAlertaTemperatura ? '#ef4444' : '#16a34a' }}>
+        <div className={`p-5 rounded-xl border flex items-center gap-4 shadow-sm transition-all w-full ${esAlertaTemperatura ? 'bg-red-50 border-red-500' : 'bg-white border-slate-200'}`}>
+          <div className={`p-4 rounded-full flex-shrink-0 ${esAlertaTemperatura ? 'bg-red-100 text-red-500' : 'bg-green-100 text-green-600'}`}>
             <Thermometer size={24} />
           </div>
-          <div>
-            <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: 'bold' }}>Sensor Camión Refrigerado</p>
-            <h2 style={{ margin: 0, fontSize: '1.5rem', color: esAlertaTemperatura ? '#ef4444' : '#0f172a' }}>{temperatura} °C</h2>
-            <p style={{ margin: 0, fontSize: '0.75rem', color: esAlertaTemperatura ? '#ef4444' : '#16a34a', fontWeight: 'bold' }}>
+          <div className="min-w-0">
+            <p className="m-0 text-sm text-slate-500 font-bold truncate">Sensor Camión</p>
+            <h2 className={`m-0 text-2xl truncate ${esAlertaTemperatura ? 'text-red-500' : 'text-slate-900'}`}>{temperatura} °C</h2>
+            <p className={`m-0 text-xs font-bold truncate ${esAlertaTemperatura ? 'text-red-500' : 'text-green-600'}`}>
               {esAlertaTemperatura ? '⚠️ Cadena de frío rota' : '✅ Temperatura óptima'}
             </p>
           </div>
         </div>
       </div>
 
-      {/* GRÁFICOS (Fila de 2) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '20px' }}>
+      {/* GRÁFICOS (Se apilan en cel, 2 columnas en PC) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         
         {/* Gráfico de Ventas Semanales */}
-        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-          <h3 style={{ marginTop: 0, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <TrendingUp size={20} color="#0284c7" /> Resumen de Ventas (Semana)
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm w-full">
+          <h3 className="m-0 text-slate-900 flex items-center gap-2 text-lg font-bold">
+            <TrendingUp size={20} className="text-sky-600" /> Resumen de Ventas
           </h3>
-          <div style={{ height: '300px', marginTop: '20px' }}>
+          <div className="h-72 mt-4 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dataGrafico}>
-                <XAxis dataKey="name" />
-                <YAxis />
+                <XAxis dataKey="name" tick={{fontSize: 12}} />
+                <YAxis tick={{fontSize: 12}} width={40} />
                 <Tooltip />
                 <Bar dataKey="ventas" fill="#0284c7" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -113,17 +105,17 @@ export default function DashboardAdmin({ datos }: { datos: any }) {
           </div>
         </div>
 
-        {/* 🔥 Gráfico de Top Productos Vendidos */}
-        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-          <h3 style={{ marginTop: 0, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Package size={20} color="#f59e0b" /> Top Productos Vendidos
+        {/* Gráfico de Top Productos Vendidos */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm w-full">
+          <h3 className="m-0 text-slate-900 flex items-center gap-2 text-lg font-bold">
+            <Package size={20} className="text-amber-500" /> Top Productos
           </h3>
-          <div style={{ height: '300px', marginTop: '20px' }}>
+          <div className="h-72 mt-4 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dataProductos} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
+              <BarChart data={dataProductos} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                <XAxis type="number" />
-                <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12}} />
+                <XAxis type="number" tick={{fontSize: 12}} />
+                <YAxis dataKey="name" type="category" width={80} tick={{fontSize: 10}} />
                 <Tooltip />
                 <Bar dataKey="ventas" fill="#f59e0b" radius={[0, 4, 4, 0]} />
               </BarChart>
@@ -133,22 +125,22 @@ export default function DashboardAdmin({ datos }: { datos: any }) {
       </div>
 
       {/* ALERTAS DE VENCIMIENTO Y MONITOREO DE FLOTA */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
+      <div className="grid grid-cols-1 gap-4">
         
         {/* Alertas de Vencimiento */}
-        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-          <h3 style={{ marginTop: 0, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Clock size={20} color="#ef4444" /> Lotes por Vencer
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <h3 className="m-0 text-slate-900 flex items-center gap-2 text-lg font-bold mb-4">
+            <Clock size={20} className="text-red-500" /> Lotes por Vencer
           </h3>
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '15px' }}>
+          <div className="flex gap-3 flex-wrap">
             {datos.lotesVencer?.length === 0 ? (
-              <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>No hay lotes por vencer. 🎉</p>
+              <p className="text-slate-400 text-sm m-0">No hay lotes por vencer. 🎉</p>
             ) : (
               datos.lotesVencer?.map((lote: any, i: number) => (
-                <div key={i} style={{ padding: '10px', backgroundColor: '#fef2f2', borderRadius: '6px', borderLeft: '4px solid #ef4444', minWidth: '200px', flex: 1 }}>
-                  <strong style={{ display: 'block', fontSize: '0.85rem', color: '#0f172a' }}>{lote.productos?.nombre}</strong>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Lote: {lote.codigo_lote}</span>
-                  <span style={{ display: 'block', fontSize: '0.75rem', color: '#b91c1c' }}>Vence: {lote.fecha_vencimiento}</span>
+                <div key={i} className="p-3 bg-red-50 rounded-md border-l-4 border-red-500 min-w-[200px] flex-1">
+                  <strong className="block text-sm text-slate-900 truncate">{lote.productos?.nombre}</strong>
+                  <span className="text-xs text-slate-500 block">Lote: {lote.codigo_lote}</span>
+                  <span className="block text-xs text-red-700 font-bold mt-1">Vence: {lote.fecha_vencimiento}</span>
                 </div>
               ))
             )}
@@ -156,27 +148,28 @@ export default function DashboardAdmin({ datos }: { datos: any }) {
         </div>
 
         {/* Monitoreo de Flota */}
-        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-          <h3 style={{ marginTop: 0, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Truck size={20} color="#0284c7" /> Monitoreo de Flota (Última milla)
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <h3 className="m-0 text-slate-900 flex items-center gap-2 text-lg font-bold mb-4">
+            <Truck size={20} className="text-sky-600" /> Monitoreo de Flota
           </h3>
-          <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', marginTop: '15px' }}>
-            <div style={{ flex: 1, minWidth: '200px', padding: '15px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 'bold' }}>Placa del Vehículo</span>
-              <h4 style={{ margin: '5px 0 0 0', color: '#0f172a' }}>CAM-001 (AgroLactec)</h4>
+          <div className="flex gap-4 flex-wrap">
+            <div className="flex-1 min-w-[150px] p-4 bg-slate-50 rounded-lg border border-slate-200">
+              <span className="text-xs text-slate-500 font-bold uppercase">Vehículo</span>
+              <h4 className="m-0 text-slate-900 mt-1 truncate">CAM-001</h4>
             </div>
-            <div style={{ flex: 1, minWidth: '200px', padding: '15px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 'bold' }}>Ruta Actual</span>
-              <h4 style={{ margin: '5px 0 0 0', color: '#0f172a' }}>San Salvador → Apopa</h4>
+            <div className="flex-1 min-w-[150px] p-4 bg-slate-50 rounded-lg border border-slate-200">
+              <span className="text-xs text-slate-500 font-bold uppercase">Ruta Actual</span>
+              <h4 className="m-0 text-slate-900 mt-1 truncate">SS → Apopa</h4>
             </div>
-            <div style={{ flex: 1, minWidth: '200px', padding: '15px', backgroundColor: esAlertaTemperatura ? '#fee2e2' : '#dcfce7', borderRadius: '8px', border: `1px solid ${esAlertaTemperatura ? '#fecaca' : '#bbf7d0'}` }}>
-              <span style={{ fontSize: '0.75rem', color: esAlertaTemperatura ? '#b91c1c' : '#15803d', fontWeight: 'bold' }}>Estado de Refrigeración</span>
-              <h4 style={{ margin: '5px 0 0 0', color: esAlertaTemperatura ? '#b91c1c' : '#15803d' }}>
-                {esAlertaTemperatura ? 'FALLA DETECTADA' : 'OPERATIVO'}
+            <div className={`flex-1 min-w-[150px] p-4 rounded-lg border ${esAlertaTemperatura ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
+              <span className={`text-xs font-bold uppercase ${esAlertaTemperatura ? 'text-red-700' : 'text-green-700'}`}>Refrigeración</span>
+              <h4 className={`m-0 mt-1 truncate ${esAlertaTemperatura ? 'text-red-700' : 'text-green-700'}`}>
+                {esAlertaTemperatura ? 'FALLA' : 'OPERATIVO'}
               </h4>
             </div>
           </div>
         </div>
+
       </div>
 
     </div>

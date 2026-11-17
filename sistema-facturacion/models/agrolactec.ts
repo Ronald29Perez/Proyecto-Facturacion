@@ -14,6 +14,7 @@ export type RolUsuario =
   | 'BODEGA' 
   | 'CAJERO' 
   | 'VENDEDOR' 
+  | 'MOTORISTA'
   | 'CLIENTE';
 
 export interface Usuario {

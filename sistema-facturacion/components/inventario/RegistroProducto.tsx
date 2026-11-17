@@ -1,7 +1,6 @@
 // ============================================================================
-// COMPONENTE: GESTIÓN DE CATÁLOGO Y FICHA DE PRODUCTOS (TABLA + MODAL)
+// COMPONENTE: GESTIÓN DE CATÁLOGO Y FICHA DE PRODUCTOS (RESPONSIVE)
 // Ubicación: components/inventario/RegistroProducto.tsx
-// BD: v3.2 — Incluye subida de imágenes a Storage
 // ============================================================================
 
 'use client';
@@ -18,7 +17,7 @@ import {
   guardarOActualizarProducto,
   cambiarEstadoProducto,
 } from '../../controllers/productoController';
-import { subirImagenProducto } from '../../controllers/storageController'; // 🔥 NUEVO
+import { subirImagenProducto } from '../../controllers/storageController';
 
 interface Props {
   productos: ProductoEntity[];
@@ -40,17 +39,13 @@ export default function RegistroProducto({
   const [productoEditar, setProductoEditar] = useState<Partial<ProductoEntity> | null>(null);
   const [guardando, setGuardando] = useState(false);
 
-  // 🔥 NUEVOS ESTADOS PARA LA IMAGEN
   const [archivoImagen, setArchivoImagen] = useState<File | null>(null);
   const [previewImagen, setPreviewImagen] = useState<string>('');
 
-  // ==========================================================================
-  // ABRIR MODAL
-  // ==========================================================================
   const handleAbrirModal = (prod?: ProductoEntity) => {
     if (prod) {
       setProductoEditar({ ...prod });
-      setPreviewImagen(prod.imagen_url || ''); // Mostrar imagen actual si existe
+      setPreviewImagen(prod.imagen_url || '');
     } else {
       setProductoEditar({
         item_code: '',
@@ -73,36 +68,20 @@ export default function RegistroProducto({
     setMostrarModal(true);
   };
 
-  // ==========================================================================
-  // GUARDAR
-  // ==========================================================================
   const handleGuardar = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!productoEditar?.item_code || !productoEditar?.nombre) {
-      alert('Por favor completa el código y el nombre del producto.');
-      return;
-    }
-
-    if (!productoEditar.id_categoria) {
-      alert('Debes seleccionar una categoría.');
-      return;
-    }
+    if (!productoEditar?.item_code || !productoEditar?.nombre) return alert('Por favor completa el código y el nombre del producto.');
+    if (!productoEditar.id_categoria) return alert('Debes seleccionar una categoría.');
 
     setGuardando(true);
     let urlFinal = productoEditar.imagen_url;
 
-    // 🔥 Si hay una imagen nueva, la subimos primero
     if (archivoImagen) {
       const urlSubida = await subirImagenProducto(archivoImagen, productoEditar.item_code);
-      if (urlSubida) {
-        urlFinal = urlSubida;
-      } else {
-        alert('⚠️ La imagen no se pudo subir, pero el producto se guardará sin foto.');
-      }
+      if (urlSubida) urlFinal = urlSubida;
+      else alert('⚠️ La imagen no se pudo subir, pero el producto se guardará sin foto.');
     }
 
-    // Guardamos el producto con la URL final
     const res = await guardarOActualizarProducto({ ...productoEditar, imagen_url: urlFinal });
     setGuardando(false);
 
@@ -113,23 +92,15 @@ export default function RegistroProducto({
     }
   };
 
-  // ==========================================================================
-  // TOGGLE ESTADO
-  // ==========================================================================
   const handleToggleEstado = async (id_producto: string, estadoActual: boolean) => {
     const accion = estadoActual ? 'descontinuar' : 'reactivar';
     if (confirm(`¿Estás seguro de que deseas ${accion} este producto?`)) {
       const res = await cambiarEstadoProducto(id_producto, !estadoActual);
       alert(res.message);
-      if (res.success) {
-        await onRefrescarDatos();
-      }
+      if (res.success) await onRefrescarDatos();
     }
   };
 
-  // ==========================================================================
-  // FILTRADO
-  // ==========================================================================
   const productosFiltrados = productos.filter((p) => {
     const term = busqueda.toLowerCase().trim();
     const nombre = (p.nombre || '').toLowerCase();
@@ -137,105 +108,88 @@ export default function RegistroProducto({
     return nombre.includes(term) || code.includes(term);
   });
 
-  const subcatsFiltradas = subcategorias.filter(
-    (s) => s.id_categoria === productoEditar?.id_categoria
-  );
-
+  const subcatsFiltradas = subcategorias.filter((s) => s.id_categoria === productoEditar?.id_categoria);
   const esVentaPorCaja = productoEditar?.unidad_medida === 'CAJA';
 
-  // ==========================================================================
-  // RENDER
-  // ==========================================================================
   return (
-    <div
-      style={{
-        backgroundColor: '#ffffff',
-        padding: '24px',
-        borderRadius: '12px',
-        border: '1px solid #e2e8f0',
-      }}
-    >
+    <div className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-sm">
       <ImportExportProductos onImportComplete={onRefrescarDatos} />
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '20px 0', flexWrap: 'wrap', gap: '15px' }}>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 my-6">
         <div>
-          <h3 style={{ margin: 0, color: '#0f172a' }}>📝 Administración de Catálogo</h3>
-          <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
-            Gestiona precios, modifica fichas técnicas o cambia el estado de productos.
-          </p>
+          <h3 className="m-0 text-slate-900 text-lg font-bold">📝 Administración de Catálogo</h3>
+          <p className="m-0 mt-1 text-sm text-slate-500">Gestiona precios, modifica fichas técnicas o cambia el estado.</p>
         </div>
         <button
           type="button"
           onClick={() => handleAbrirModal()}
-          style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', padding: '10px 18px', borderRadius: '6px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+          className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-5 rounded-md flex justify-center items-center gap-2 transition-colors"
         >
           ➕ Nuevo Producto
         </button>
       </div>
 
-      <div style={{ marginBottom: '15px' }}>
+      <div className="mb-4">
         <input
           type="text"
           placeholder="🔍 Buscar producto por código o nombre..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}
+          className="w-full px-4 py-2.5 rounded-md border border-slate-300 text-sm focus:outline-none focus:border-sky-500"
         />
       </div>
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
-          <thead>
-            <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569' }}>
-              <th style={{ padding: '12px' }}>Imagen</th>
-              <th style={{ padding: '12px' }}>Código</th>
-              <th style={{ padding: '12px' }}>Producto</th>
-              <th style={{ padding: '12px' }}>Categoría</th>
-              <th style={{ padding: '12px' }}>Precio B2C</th>
-              <th style={{ padding: '12px' }}>Precio B2B</th>
-              <th style={{ padding: '12px' }}>Estado</th>
-              <th style={{ padding: '12px', textAlign: 'center' }}>Acciones</th>
+      {/* TABLA RESPONSIVE CON SCROLL HORIZONTAL */}
+      <div className="overflow-x-auto border border-slate-200 rounded-lg">
+        <table className="w-full text-left text-sm whitespace-nowrap min-w-[800px]">
+          <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
+            <tr>
+              <th className="p-3">Imagen</th>
+              <th className="p-3">Código</th>
+              <th className="p-3">Producto</th>
+              <th className="p-3">Categoría</th>
+              <th className="p-3">Precio B2C</th>
+              <th className="p-3">Precio B2B</th>
+              <th className="p-3">Estado</th>
+              <th className="p-3 text-center">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {productosFiltrados.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>No se encontraron productos registrados.</td>
+                <td colSpan={8} className="text-center p-8 text-slate-400">No se encontraron productos registrados.</td>
               </tr>
             ) : (
               productosFiltrados.map((p) => {
                 const esActivo = p.activo !== false;
                 return (
-                  <tr key={p.id_producto} style={{ borderBottom: '1px solid #f1f5f9', opacity: esActivo ? 1 : 0.55, backgroundColor: esActivo ? '#ffffff' : '#f8fafc' }}>
-                    {/* 🔥 Miniaturas en la tabla */}
-                    <td style={{ padding: '12px' }}>
-                      <div style={{ width: '40px', height: '40px', borderRadius: '4px', backgroundColor: '#f1f5f9', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <tr key={p.id_producto} className={`border-b border-slate-100 transition-opacity ${esActivo ? 'bg-white' : 'bg-slate-50 opacity-60'}`}>
+                    <td className="p-3">
+                      <div className="w-10 h-10 rounded border border-slate-200 bg-slate-100 overflow-hidden flex items-center justify-center shrink-0">
                         {p.imagen_url ? (
-                          <img src={p.imagen_url} alt={p.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img src={p.imagen_url} alt={p.nombre} className="w-full h-full object-cover" />
                         ) : (
-                          <span style={{ fontSize: '0.6rem', color: '#94a3b8' }}>N/A</span>
+                          <span className="text-[10px] text-slate-400">N/A</span>
                         )}
                       </div>
                     </td>
-                    <td style={{ padding: '12px', fontWeight: 'bold', color: '#0284c7' }}>{p.item_code}</td>
-                    <td style={{ padding: '12px', color: '#0f172a', fontWeight: '500' }}>{p.nombre}</td>
-                    <td style={{ padding: '12px', color: '#64748b' }}>
+                    <td className="p-3 font-bold text-sky-600">{p.item_code}</td>
+                    <td className="p-3 text-slate-900 font-medium">{p.nombre}</td>
+                    <td className="p-3 text-slate-500">
                       {p.categorias?.nombre || '—'}
-                      {p.subcategorias?.nombre && (
-                        <><br /><span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{p.subcategorias.nombre}</span></>
-                      )}
+                      {p.subcategorias?.nombre && <><br /><span className="text-xs text-slate-400">{p.subcategorias.nombre}</span></>}
                     </td>
-                    <td style={{ padding: '12px', fontWeight: 'bold', color: '#16a34a' }}>${Number(p.precio_b2c || 0).toFixed(2)}</td>
-                    <td style={{ padding: '12px', fontWeight: 'bold', color: '#0284c7' }}>${Number(p.precio_b2b || 0).toFixed(2)}</td>
-                    <td style={{ padding: '12px' }}>
-                      <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 'bold', backgroundColor: esActivo ? '#dcfce7' : '#fee2e2', color: esActivo ? '#15803d' : '#b91c1c' }}>
-                        {esActivo ? '🟢 Activo' : '🔴 Descontinuado'}
+                    <td className="p-3 font-bold text-green-600">${Number(p.precio_b2c || 0).toFixed(2)}</td>
+                    <td className="p-3 font-bold text-sky-600">${Number(p.precio_b2b || 0).toFixed(2)}</td>
+                    <td className="p-3">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${esActivo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {esActivo ? '🟢 Activo' : '🔴 Inactivo'}
                       </span>
                     </td>
-                    <td style={{ padding: '12px', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                        <button type="button" onClick={() => handleAbrirModal(p)} style={{ backgroundColor: '#3b82f6', color: '#ffffff', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>✏️ Modificar</button>
-                        <button type="button" onClick={() => p.id_producto && handleToggleEstado(p.id_producto, esActivo)} disabled={!p.id_producto} style={{ backgroundColor: esActivo ? '#ef4444' : '#22c55e', color: '#ffffff', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                    <td className="p-3 text-center">
+                      <div className="flex gap-2 justify-center">
+                        <button onClick={() => handleAbrirModal(p)} className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors">✏️ Modificar</button>
+                        <button onClick={() => p.id_producto && handleToggleEstado(p.id_producto, esActivo)} disabled={!p.id_producto} className={`px-3 py-1.5 rounded text-xs font-bold text-white transition-colors ${esActivo ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}>
                           {esActivo ? '🚫 Descontinuar' : '🔄 Reactivar'}
                         </button>
                       </div>
@@ -248,137 +202,110 @@ export default function RegistroProducto({
         </table>
       </div>
 
-      {/* 5. MODAL */}
+      {/* MODAL RESPONSIVE */}
       {mostrarModal && productoEditar && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(15, 23, 42, 0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999, padding: '20px' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '24px', maxWidth: '700px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
-            <h3 style={{ marginTop: 0, color: '#0f172a' }}>
+        <div className="fixed inset-0 bg-slate-900/60 flex justify-center items-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl p-5 md:p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            <h3 className="mt-0 text-slate-900 text-xl font-bold border-b pb-3 mb-5">
               {productoEditar.id_producto ? '✏️ Modificar Producto' : '➕ Registrar Nuevo Producto'}
             </h3>
 
-            <form onSubmit={handleGuardar} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+            <form onSubmit={handleGuardar} className="grid grid-cols-1 md:grid-cols-2 gap-4">
               
-              {/* Código */}
               <div>
-                <label style={labelStyle}>Código Ítem *</label>
-                <input type="text" required value={productoEditar.item_code || ''} onChange={(e) => setProductoEditar({ ...productoEditar, item_code: e.target.value })} style={inputStyle} />
+                <label className="text-xs font-bold text-slate-600 block mb-1">Código Ítem *</label>
+                <input type="text" required value={productoEditar.item_code || ''} onChange={(e) => setProductoEditar({ ...productoEditar, item_code: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:border-sky-500" />
               </div>
               <div>
-                <label style={labelStyle}>NSO (Registro Sanitario)</label>
-                <input type="text" value={productoEditar.nso || ''} onChange={(e) => setProductoEditar({ ...productoEditar, nso: e.target.value })} style={inputStyle} />
-              </div>
-
-              {/* Nombre completo */}
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={labelStyle}>Nombre del Producto *</label>
-                <input type="text" required value={productoEditar.nombre || ''} onChange={(e) => setProductoEditar({ ...productoEditar, nombre: e.target.value })} style={inputStyle} />
+                <label className="text-xs font-bold text-slate-600 block mb-1">NSO (Registro Sanitario)</label>
+                <input type="text" value={productoEditar.nso || ''} onChange={(e) => setProductoEditar({ ...productoEditar, nso: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:border-sky-500" />
               </div>
 
-              {/* Categoría y Subcategoría */}
+              <div className="md:col-span-2">
+                <label className="text-xs font-bold text-slate-600 block mb-1">Nombre del Producto *</label>
+                <input type="text" required value={productoEditar.nombre || ''} onChange={(e) => setProductoEditar({ ...productoEditar, nombre: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:border-sky-500" />
+              </div>
+
               <div>
-                <label style={labelStyle}>Categoría *</label>
-                <select value={productoEditar.id_categoria || ''} onChange={(e) => setProductoEditar({ ...productoEditar, id_categoria: e.target.value, id_subcategoria: undefined })} style={inputStyle}>
+                <label className="text-xs font-bold text-slate-600 block mb-1">Categoría *</label>
+                <select value={productoEditar.id_categoria || ''} onChange={(e) => setProductoEditar({ ...productoEditar, id_categoria: e.target.value, id_subcategoria: undefined })} className="w-full px-3 py-2 border border-slate-300 rounded-md bg-white">
                   <option value="">-- Selecciona --</option>
                   {categorias.map((c) => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>Subcategoría</label>
-                <select value={productoEditar.id_subcategoria || ''} onChange={(e) => setProductoEditar({ ...productoEditar, id_subcategoria: e.target.value || undefined })} style={inputStyle} disabled={subcatsFiltradas.length === 0}>
+                <label className="text-xs font-bold text-slate-600 block mb-1">Subcategoría</label>
+                <select value={productoEditar.id_subcategoria || ''} onChange={(e) => setProductoEditar({ ...productoEditar, id_subcategoria: e.target.value || undefined })} disabled={subcatsFiltradas.length === 0} className="w-full px-3 py-2 border border-slate-300 rounded-md bg-white disabled:bg-slate-100">
                   <option value="">-- Ninguna --</option>
                   {subcatsFiltradas.map((s) => <option key={s.id_subcategoria} value={s.id_subcategoria}>{s.nombre}</option>)}
                 </select>
               </div>
 
-              {/* Proveedor */}
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={labelStyle}>Proveedor</label>
-                <select value={productoEditar.id_proveedor || ''} onChange={(e) => setProductoEditar({ ...productoEditar, id_proveedor: e.target.value || undefined })} style={inputStyle}>
+              <div className="md:col-span-2">
+                <label className="text-xs font-bold text-slate-600 block mb-1">Proveedor</label>
+                <select value={productoEditar.id_proveedor || ''} onChange={(e) => setProductoEditar({ ...productoEditar, id_proveedor: e.target.value || undefined })} className="w-full px-3 py-2 border border-slate-300 rounded-md bg-white">
                   <option value="">-- Sin proveedor --</option>
                   {proveedores.map((p) => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre}</option>)}
                 </select>
               </div>
 
-              {/* Unidad Base y Factor de conversión */}
               <div>
-                <label style={labelStyle}>Unidad de Venta (B2C) *</label>
+                <label className="text-xs font-bold text-slate-600 block mb-1">Unidad de Venta (B2C) *</label>
                 <select 
                   value={productoEditar.unidad_medida || 'UNIDAD'} 
                   onChange={(e) => {
                     const nuevaUnidad = e.target.value as any;
                     setProductoEditar({ ...productoEditar, unidad_medida: nuevaUnidad, unidades_por_caja: nuevaUnidad === 'CAJA' ? 1 : (productoEditar.unidades_por_caja || 12) });
                   }} 
-                  style={inputStyle}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md bg-white"
                 >
-                  <option value="UNIDAD">Unidad (Chorizo, Queso)</option>
+                  <option value="UNIDAD">Unidad</option>
                   <option value="LIBRA">Libra</option>
                   <option value="PAQUETE">Paquete</option>
-                  <option value="CAJA">Caja (Crema, Leche)</option>
+                  <option value="CAJA">Caja</option>
                 </select>
               </div>
               
               {!esVentaPorCaja && (
                 <div>
-                  <label style={labelStyle}>Unidades por Caja (B2B) *</label>
-                  <input type="number" min={1} value={productoEditar.unidades_por_caja || 1} onChange={(e) => setProductoEditar({ ...productoEditar, unidades_por_caja: Number(e.target.value) })} style={inputStyle} />
-                  <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', marginTop: '4px' }}>Ej: Si una caja trae 15 unidades, pon 15.</span>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">Unidades por Caja *</label>
+                  <input type="number" min={1} value={productoEditar.unidades_por_caja || 1} onChange={(e) => setProductoEditar({ ...productoEditar, unidades_por_caja: Number(e.target.value) })} className="w-full px-3 py-2 border border-slate-300 rounded-md" />
                 </div>
               )}
 
-              {/* Precios */}
               <div>
-                <label style={labelStyle}>Precio B2C (por {esVentaPorCaja ? 'Caja' : (productoEditar.unidad_medida?.toLowerCase() || 'Unidad')})</label>
-                <input type="number" step="0.01" value={productoEditar.precio_b2c || 0} onChange={(e) => setProductoEditar({ ...productoEditar, precio_b2c: Number(e.target.value) })} style={inputStyle} />
+                <label className="text-xs font-bold text-slate-600 block mb-1">Precio B2C *</label>
+                <input type="number" step="0.01" value={productoEditar.precio_b2c || 0} onChange={(e) => setProductoEditar({ ...productoEditar, precio_b2c: Number(e.target.value) })} className="w-full px-3 py-2 border border-slate-300 rounded-md" />
               </div>
               <div>
-                <label style={labelStyle}>Precio B2B (por Caja)</label>
-                <input type="number" step="0.01" value={productoEditar.precio_b2b || 0} onChange={(e) => setProductoEditar({ ...productoEditar, precio_b2b: Number(e.target.value) })} style={inputStyle} />
+                <label className="text-xs font-bold text-slate-600 block mb-1">Precio B2B (Caja) *</label>
+                <input type="number" step="0.01" value={productoEditar.precio_b2b || 0} onChange={(e) => setProductoEditar({ ...productoEditar, precio_b2b: Number(e.target.value) })} className="w-full px-3 py-2 border border-slate-300 rounded-md" />
               </div>
 
-              {/* 🔥 NUEVO CAMPO: Imagen del Producto */}
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={labelStyle}>Foto del Producto (JPG/PNG)</label>
-                <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginTop: '8px' }}>
-                  {/* Previsualización */}
-                  <div style={{ width: '80px', height: '80px', borderRadius: '8px', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '1px solid #cbd5e1' }}>
-                    {previewImagen ? (
-                      <img src={previewImagen} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Sin foto</span>
-                    )}
+              <div className="md:col-span-2">
+                <label className="text-xs font-bold text-slate-600 block mb-1">Foto del Producto</label>
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center mt-1">
+                  <div className="w-20 h-20 rounded-lg bg-slate-100 flex items-center justify-center border border-slate-300 overflow-hidden shrink-0">
+                    {previewImagen ? <img src={previewImagen} alt="Preview" className="w-full h-full object-cover" /> : <span className="text-[10px] text-slate-400">Sin foto</span>}
                   </div>
-
-                  {/* Input File */}
-                  <div style={{ flex: 1 }}>
-                    <input
-                      type="file"
-                      accept="image/png, image/jpeg, image/webp"
-                      onChange={(e) => {
+                  <div className="flex-1 w-full">
+                    <input type="file" accept="image/png, image/jpeg, image/webp" onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (file) {
-                          setArchivoImagen(file);
-                          setPreviewImagen(URL.createObjectURL(file)); // Vista previa local rápida
-                        }
-                      }}
-                      style={{ fontSize: '0.85rem' }}
-                    />
-                    <p style={{ fontSize: '0.7rem', color: '#64748b', margin: '4px 0 0 0' }}>
-                      Formatos aceptados: JPG, PNG o WEBP. Se guardará en la nube.
-                    </p>
+                        if (file) { setArchivoImagen(file); setPreviewImagen(URL.createObjectURL(file)); }
+                      }} className="text-sm w-full file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-bold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100" />
+                    <p className="text-[10px] text-slate-500 mt-1">Formatos aceptados: JPG, PNG o WEBP.</p>
                   </div>
                 </div>
               </div>
 
-              {/* Descripción */}
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={labelStyle}>Descripción (opcional)</label>
-                <textarea rows={2} value={productoEditar.descripcion || ''} onChange={(e) => setProductoEditar({ ...productoEditar, descripcion: e.target.value })} style={inputStyle} />
+              <div className="md:col-span-2">
+                <label className="text-xs font-bold text-slate-600 block mb-1">Descripción (opcional)</label>
+                <textarea rows={2} value={productoEditar.descripcion || ''} onChange={(e) => setProductoEditar({ ...productoEditar, descripcion: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-md resize-none" />
               </div>
 
-              {/* Botones */}
-              <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '15px' }}>
-                <button type="button" onClick={() => setMostrarModal(false)} style={{ backgroundColor: '#64748b', color: '#fff', padding: '8px 16px', borderRadius: '6px', border: 'none', cursor: 'pointer' }}>Cancelar</button>
-                <button type="submit" disabled={guardando} style={{ backgroundColor: '#16a34a', color: '#fff', padding: '8px 20px', borderRadius: '6px', border: 'none', fontWeight: 'bold', cursor: guardando ? 'not-allowed' : 'pointer' }}>
+              <div className="md:col-span-2 flex flex-col sm:flex-row justify-end gap-3 mt-4 border-t pt-4">
+                <button type="button" onClick={() => setMostrarModal(false)} className="w-full sm:w-auto px-6 py-2.5 bg-slate-500 hover:bg-slate-600 text-white rounded-md font-bold transition-colors">Cancelar</button>
+                <button type="submit" disabled={guardando} className="w-full sm:w-auto px-6 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-slate-400 text-white rounded-md font-bold transition-colors">
                   {guardando ? 'Guardando...' : '💾 Guardar Producto'}
                 </button>
               </div>
@@ -389,18 +316,3 @@ export default function RegistroProducto({
     </div>
   );
 }
-
-const labelStyle: React.CSSProperties = {
-  fontSize: '0.8rem',
-  fontWeight: 'bold',
-  color: '#475569',
-  display: 'block',
-  marginBottom: '4px',
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '8px',
-  borderRadius: '4px',
-  border: '1px solid #cbd5e1',
-};
