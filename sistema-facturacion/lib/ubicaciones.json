@@ -1,0 +1,18 @@
+[
+  {
+    "departamento": "San Salvador",
+    "municipios": ["San Salvador", "Apopa", "Antiguo Cuscatlán", "Mejicanos", "Soyapango", "Ilopango", "Tonacatepeque", "Ayutuxtepeque", "Cuscatancingo", "Delgado", "San Marcos", "Nuevo Cuscatlán", "Santa Tecla"]
+  },
+  {
+    "departamento": "La Libertad",
+    "municipios": ["Santa Tecla", "Antiguo Cuscatlán", "Nuevo Cuscatlán", "San José Villanueva", "Zaragoza", "Huizúcar", "Comasagua", "Tamanique", "Chiltiupán", "Jicalapa", "Teotepeque", "Tepecoyo", "Talnique", "Sacacoyo", "Ciudad Arce", "San Juan Opico", "Quezaltepeque", "San Matías", "San Pablo Tacachico"]
+  },
+  {
+    "departamento": "Santa Ana",
+    "municipios": ["Santa Ana", "Chalchuapa", "Coatepeque", "El Congo", "Texistepeque", "Candelaria de la Frontera", "San Sebastián Salitrillo", "Santiago de la Frontera", "El Porvenir", "Masahuat", "Metapán", "San Antonio Pajonal", "Santa Rosa Guachipilín", "San Felipe"]
+  },
+  {
+    "departamento": "San Miguel",
+    "municipios": ["San Miguel", "Chirilagua", "Ciudad Barrios", "Carolina", "Chapeltique", "Chinameca", "El Tránsito", "Lolotique", "Moncagua", "Nueva Guadalupe", "Nuevo Edén de San Juan", "Quelepa", "San Antonio del Mosco", "San Gerardo", "San Jorge", "San Luis de la Reina", "San Rafael Oriente", "Sesori", "Uluazapa"]
+  }
+]

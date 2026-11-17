@@ -1,5 +1,5 @@
 // ============================================================================
-// COMPONENTE: PORTAL DE PEDIDOS CLIENTE (RESPONSIVE GARANTIZADO)
+// COMPONENTE: PORTAL DE PEDIDOS CLIENTE (RESPONSIVE Y VALIDADO)
 // Ubicación: components/cliente/VistaClientePedido.tsx
 // ============================================================================
 
@@ -10,11 +10,15 @@ import Image from 'next/image';
 import { supabase } from '../../lib/supabase';
 import { 
   ShoppingCart, LogOut, Search, Plus, Trash2, Send, 
-  CheckCircle, CreditCard, Building2, ArrowLeft, ShieldCheck, Lock, Package, ShoppingBag, Truck
+  CheckCircle, CreditCard, Building2, ArrowLeft, ShieldCheck, Lock, Package, Truck
 } from 'lucide-react';
 import { ProductoEntity, CategoriaEntity, Usuario, ResumenCarrito, ItemCarrito as ItemCarritoModel } from '../../models/agrolactec';
 import { crearCotizacionDesdeCarrito } from '../../controllers/cotizacionController';
+import ubicaciones from '../../lib/ubicaciones.json';
 
+// ============================================================================
+// 1. TIPOS E INTERFACES
+// ============================================================================
 interface ItemCarritoUI {
   producto: ProductoEntity;
   cajas: number;
@@ -29,42 +33,20 @@ interface Props {
   onCerrarSesion: () => void;
 }
 
+// ============================================================================
+// 2. COMPONENTE PRINCIPAL
+// ============================================================================
 export default function VistaClientePedido({
   usuario,
   productos,
   categorias,
   onCerrarSesion,
 }: Props) {
-  const [vista, setVista] = useState<'CATALOGO' | 'MIS_PEDIDOS'>('CATALOGO');
-  const [misPedidos, setMisPedidos] = useState<any[]>([]);
-
-  const [busqueda, setBusqueda] = useState('');
-  const [categoriaSel, setCategoriaSel] = useState('');
-  const [carrito, setCarrito] = useState<ItemCarritoUI[]>([]);
-  const [tipoVenta, setTipoVenta] = useState<'B2C_HOGAR' | 'B2B_COMERCIO'>('B2C_HOGAR');
   
-  const [nombreCliente, setNombreCliente] = useState(usuario.nombre_completo);
-  const [razonSocial, setRazonSocial] = useState('');
-  const [nit, setNit] = useState('');
-  const [nrc, setNrc] = useState('');
-  const [telefonoCliente, setTelefonoCliente] = useState('');
-  const [direccionEntrega, setDireccionEntrega] = useState('');
-  const [emailCliente, setEmailCliente] = useState('');
-  const [enviando, setEnviando] = useState(false);
-
-  const [paso, setPaso] = useState<1 | 2 | 3>(1);
-  const [cotizacionCreada, setCotizacionCreada] = useState<any>(null);
-  const [metodoPago, setMetodoPago] = useState<'TARJETA' | 'TRANSFERENCIA' | null>(null);
-  const [procesandoPago, setProcesandoPago] = useState(false);
-
-  const [numTarjeta, setNumTarjeta] = useState('');
-  const [vencimiento, setVencimiento] = useState('');
-  const [cvc, setCvc] = useState('');
-  const [nombreTarjeta, setNombreTarjeta] = useState('');
-  const [errorPago, setErrorPago] = useState('');
-
-  // Detectar si es móvil para ajustar estilos en línea
+  // --- ESTADOS DE NAVEGACIÓN Y UI ---
+  const [vista, setVista] = useState<'CATALOGO' | 'MIS_PEDIDOS'>('CATALOGO');
   const [isMobile, setIsMobile] = useState(false);
+  
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 900);
     checkMobile();
@@ -72,6 +54,43 @@ export default function VistaClientePedido({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // --- ESTADOS DEL CARRITO ---
+  const [busqueda, setBusqueda] = useState('');
+  const [categoriaSel, setCategoriaSel] = useState('');
+  const [carrito, setCarrito] = useState<ItemCarritoUI[]>([]);
+  const [tipoVenta, setTipoVenta] = useState<'B2C_HOGAR' | 'B2B_COMERCIO'>('B2C_HOGAR');
+
+  // --- ESTADOS DEL FORMULARIO (CLIENTE) ---
+  const [nombreCliente, setNombreCliente] = useState(usuario.nombre_completo);
+  const [razonSocial, setRazonSocial] = useState('');
+  const [nit, setNit] = useState('');
+  const [nrc, setNrc] = useState('');
+  const [telefonoCliente, setTelefonoCliente] = useState('');
+  const [emailCliente, setEmailCliente] = useState('');
+  const [departamentoSel, setDepartamentoSel] = useState('');
+  const [municipioSel, setMunicipioSel] = useState('');
+  const [detalleDireccion, setDetalleDireccion] = useState('');
+  const [enviando, setEnviando] = useState(false);
+
+  // --- ESTADOS DEL FLUJO DE PAGO ---
+  const [paso, setPaso] = useState<1 | 2 | 3>(1);
+  const [cotizacionCreada, setCotizacionCreada] = useState<any>(null);
+  const [metodoPago, setMetodoPago] = useState<'TARJETA' | 'TRANSFERENCIA' | null>(null);
+  const [procesandoPago, setProcesandoPago] = useState(false);
+
+  // --- ESTADOS DE TARJETA ---
+  const [numTarjeta, setNumTarjeta] = useState('');
+  const [vencimiento, setVencimiento] = useState('');
+  const [cvc, setCvc] = useState('');
+  const [nombreTarjeta, setNombreTarjeta] = useState('');
+  const [errorPago, setErrorPago] = useState('');
+
+  // --- ESTADOS DE HISTORIAL ---
+  const [misPedidos, setMisPedidos] = useState<any[]>([]);
+
+  // ============================================================================
+  // 3. LÓGICA DE DATOS Y FILTROS
+  // ============================================================================
   const cargarMisPedidos = async () => {
     const { data } = await supabase
       .from('cotizaciones')
@@ -95,6 +114,12 @@ export default function VistaClientePedido({
     return coincideTexto && coincideCat;
   });
 
+  const municipiosDisponibles = ubicaciones.find(u => u.departamento === departamentoSel)?.municipios || [];
+  const totalPedido = carrito.reduce((sum, item) => sum + item.subtotal, 0);
+
+  // ============================================================================
+  // 4. MANEJO DEL CARRITO
+  // ============================================================================
   const handleAgregarAlCarrito = (prod: ProductoEntity, cajas: number, unidades: number) => {
     if (cajas <= 0 && unidades <= 0) return alert('Ingresa al menos 1 caja o 1 unidad.');
     const precioUnitario = prod.precio_b2c || 0;
@@ -117,25 +142,62 @@ export default function VistaClientePedido({
     setCarrito(carrito.filter((item) => item.producto.id_producto !== id_producto));
   };
 
-  const totalPedido = carrito.reduce((sum, item) => sum + item.subtotal, 0);
-
+  // ============================================================================
+  // 5. LÓGICA DE VALIDACIÓN Y CONFIRMACIÓN DE PEDIDO
+  // ============================================================================
   const handleConfirmarPedido = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (carrito.length === 0) return alert('El carrito está vacío.');
-    if (!nombreCliente || !telefonoCliente || !direccionEntrega || !emailCliente) return alert('Completa los campos obligatorios.');
+    
+    // --- BLOQUE DE VALIDACIÓN ESTRICTA (A PRUEBA DE BALAS) ---
+    if (carrito.length === 0) {
+      return alert('⚠️ El carrito está vacío. Agrega productos antes de continuar.');
+    }
+    if (!nombreCliente.trim()) {
+      return alert('⚠️ El campo "Nombre" es obligatorio.');
+    }
+    if (!emailCliente.trim()) {
+      return alert('⚠️ El campo "Correo Electrónico" es obligatorio.');
+    }
+    
+    // Validación estricta de correo
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(emailCliente)) {
+      return alert('⚠️ El correo no tiene un formato válido (debe ser ejemplo@dominio.com).');
+    }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(emailCliente)) return alert('Ingresa un correo electrónico válido.');
+    if (!telefonoCliente.trim()) {
+      return alert('⚠️ El campo "Teléfono" es obligatorio.');
+    }
 
-    if (tipoVenta === 'B2B_COMERCIO' && (!nit || !nrc || !razonSocial)) return alert('Completa los datos fiscales B2B.');
+    // Validación estricta de teléfono
+    const telefonoRegex = /^[0-9\s-]{8,15}$/;
+    if (!telefonoRegex.test(telefonoCliente)) {
+      return alert('⚠️ El teléfono debe tener entre 8 y 15 caracteres y solo contener números y guiones.');
+    }
 
+    if (!departamentoSel || !municipioSel || !detalleDireccion.trim()) {
+      return alert('⚠️ Debes completar toda la información de ubicación y dirección de entrega.');
+    }
+
+    if (tipoVenta === 'B2B_COMERCIO' && (!nit.trim() || !nrc.trim() || !razonSocial.trim())) {
+      return alert('⚠️ Completa los datos fiscales B2B (Razón Social, NIT y NRC).');
+    }
+
+    // Si el código llega aquí, TODO está correcto.
     setEnviando(true);
     try {
+      const direccionCompleta = `${detalleDireccion}, ${municipioSel}, ${departamentoSel}, El Salvador`;
+
+      // 1. Guardar o actualizar el cliente
       await supabase.from('clientes').upsert({
-        tipo: tipoVenta, nombre: nombreCliente, telefono: telefonoCliente,
-        email: emailCliente, direccion: direccionEntrega,
+        tipo: tipoVenta, 
+        nombre: nombreCliente, 
+        telefono: telefonoCliente,
+        email: emailCliente, 
+        direccion: direccionCompleta,
       }, { onConflict: 'email' });
 
+      // 2. Armar resumen de cotización
       const subtotal = totalPedido;
       const iva = parseFloat((subtotal * 0.13).toFixed(2));
       const total = parseFloat((subtotal + iva).toFixed(2));
@@ -149,11 +211,15 @@ export default function VistaClientePedido({
       }));
 
       const resumen: ResumenCarrito = { items, subtotal, impuesto_iva: iva, total };
+      
       const datosEntregaJSON = JSON.stringify({
-        telefono: telefonoCliente, direccion: direccionEntrega, email: emailCliente,
+        telefono: telefonoCliente, 
+        direccion: direccionCompleta, 
+        email: emailCliente,
         ...(tipoVenta === 'B2B_COMERCIO' ? { razon_social: razonSocial, nit, nrc } : {})
       });
 
+      // 3. Crear cotización
       const resultado = await crearCotizacionDesdeCarrito(resumen, nombreCliente, tipoVenta, undefined, datosEntregaJSON);
       if (!resultado.success) throw new Error(resultado.message);
 
@@ -166,6 +232,9 @@ export default function VistaClientePedido({
     }
   };
 
+  // ============================================================================
+  // 6. LÓGICA DE PAGO
+  // ============================================================================
   const handlePagarTarjeta = async () => {
     setErrorPago('');
     const tarjetaLimpia = numTarjeta.replace(/\s/g, '');
@@ -197,7 +266,7 @@ export default function VistaClientePedido({
             productos: carrito.map(c => ({ cantidad: c.cajas > 0 ? c.cajas : c.unidades, nombre: c.producto.nombre, precio: c.subtotal }))
           })
         });
-      } catch (e) { console.error(e); }
+      } catch (e) { console.error('Error enviando correo:', e); }
 
       alert('✅ ¡Pago procesado con éxito! Revisa tu correo.');
       setCarrito([]); setCotizacionCreada(null); setMetodoPago(null); setPaso(1); setVista('MIS_PEDIDOS'); 
@@ -208,13 +277,15 @@ export default function VistaClientePedido({
     }
   };
 
+  // ============================================================================
+  // 7. RENDERIZADO DE LA INTERFAZ (JSX)
+  // ============================================================================
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: 'system-ui, sans-serif' }}>
       
-      {/* HEADER RESPONSIVE */}
+      {/* --- SECCIÓN: HEADER --- */}
       {usuario.rol === 'CLIENTE' && (
         <header style={{ backgroundColor: '#0284c7', color: '#fff', padding: '12px 16px', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-          
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ backgroundColor: '#ffffff', borderRadius: '6px', padding: '4px 8px' }}>
               <Image src="/img/logo-agrolactec.png" alt="AgroLactec" width={80} height={24} style={{ objectFit: 'contain' }} priority />
@@ -224,24 +295,17 @@ export default function VistaClientePedido({
               <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#e0f2fe' }}>Hola, {usuario.nombre_completo.split(' ')[0]}</p>
             </div>
           </div>
-
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button onClick={() => setVista('CATALOGO')} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', borderBottom: vista === 'CATALOGO' ? '2px solid #fff' : '2px solid transparent', paddingBottom: '2px' }}>
-              Catálogo
-            </button>
-            <button onClick={() => setVista('MIS_PEDIDOS')} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', borderBottom: vista === 'MIS_PEDIDOS' ? '2px solid #fff' : '2px solid transparent', paddingBottom: '2px' }}>
-              Pedidos
-            </button>
-            <button onClick={onCerrarSesion} style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer' }}>
-              Salir
-            </button>
+            <button onClick={() => setVista('CATALOGO')} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', borderBottom: vista === 'CATALOGO' ? '2px solid #fff' : '2px solid transparent', paddingBottom: '2px' }}>Catálogo</button>
+            <button onClick={() => setVista('MIS_PEDIDOS')} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', borderBottom: vista === 'MIS_PEDIDOS' ? '2px solid #fff' : '2px solid transparent', paddingBottom: '2px' }}>Pedidos</button>
+            <button onClick={onCerrarSesion} style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer' }}>Salir</button>
           </div>
         </header>
       )}
 
       {vista === 'CATALOGO' && (
         <>
-          {/* INDICADOR DE PASOS RESPONSIVE */}
+          {/* --- SECCIÓN: INDICADOR DE PASOS --- */}
           <div style={{ backgroundColor: '#fff', padding: '10px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'center', gap: '15px', flexWrap: 'wrap', fontSize: '0.8rem' }}>
             {[{ num: 1, label: 'Armar Pedido' }, { num: 2, label: 'Confirmación' }, { num: 3, label: 'Pago' }].map((s) => (
               <div key={s.num} style={{ display: 'flex', alignItems: 'center', gap: '5px', color: paso >= s.num ? '#0284c7' : '#94a3b8', fontWeight: 'bold' }}>
@@ -251,11 +315,10 @@ export default function VistaClientePedido({
             ))}
           </div>
 
-          {/* PASO 1: CATÁLOGO Y CARRITO */}
+          {/* --- SECCIÓN: PASO 1 (CATÁLOGO Y CARRITO) --- */}
           {paso === 1 && (
             <div style={{ padding: '16px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '20px', maxWidth: '1200px', margin: '0 auto' }}>
               
-              {/* Catálogo */}
               <div style={{ flex: isMobile ? 'none' : 2, width: '100%' }}>
                 <div style={{ backgroundColor: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '15px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '10px' }}>
                   <div style={{ flex: 1, position: 'relative' }}>
@@ -267,7 +330,6 @@ export default function VistaClientePedido({
                     {categorias.map((c) => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>)}
                   </select>
                 </div>
-
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
                   {productosActivos.map((p) => (
                     <TarjetaProductoCliente key={p.id_producto} producto={p} onAgregar={handleAgregarAlCarrito} />
@@ -275,13 +337,11 @@ export default function VistaClientePedido({
                 </div>
               </div>
 
-              {/* Carrito y Formulario */}
               <div style={{ flex: isMobile ? 'none' : 1, width: '100%', minWidth: isMobile ? '100%' : '320px' }}>
                 <div style={{ backgroundColor: '#fff', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', height: 'fit-content', position: isMobile ? 'static' : 'sticky', top: '20px' }}>
                   <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.1rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
                     <ShoppingCart size={20} color="#0284c7" /> Tu Pedido
                   </h3>
-
                   {carrito.length === 0 ? (
                     <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Aún no has agregado productos.</p>
                   ) : (
@@ -307,26 +367,69 @@ export default function VistaClientePedido({
                     </div>
                   )}
 
+                  {/* --- SECCIÓN: FORMULARIO --- */}
                   <form onSubmit={handleConfirmarPedido} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <select value={tipoVenta} onChange={(e) => setTipoVenta(e.target.value as any)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
                       <option value="B2C_HOGAR">Detalle (B2C)</option>
                       <option value="B2B_COMERCIO">Mayoreo (B2B)</option>
                     </select>
-                    <input type="text" required placeholder="Nombre *" value={nombreCliente} onChange={(e) => setNombreCliente(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
+                    
+                    <input type="text" placeholder="Nombre *" value={nombreCliente} onChange={(e) => setNombreCliente(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
                     
                     {tipoVenta === 'B2B_COMERCIO' && (
                       <>
-                        <input type="text" required placeholder="Razón Social *" value={razonSocial} onChange={(e) => setRazonSocial(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
+                        <input type="text" placeholder="Razón Social *" value={razonSocial} onChange={(e) => setRazonSocial(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
                         <div style={{ display: 'flex', gap: '8px' }}>
-                          <input type="text" required placeholder="NIT *" value={nit} onChange={(e) => setNit(e.target.value)} style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
-                          <input type="text" required placeholder="NRC *" value={nrc} onChange={(e) => setNrc(e.target.value)} style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
+                          <input type="text" placeholder="NIT *" value={nit} onChange={(e) => setNit(e.target.value)} style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
+                          <input type="text" placeholder="NRC *" value={nrc} onChange={(e) => setNrc(e.target.value)} style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
                         </div>
                       </>
                     )}
 
-                    <input type="email" required placeholder="Correo Electrónico *" value={emailCliente} onChange={(e) => setEmailCliente(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
-                    <input type="text" required placeholder="Teléfono *" value={telefonoCliente} onChange={(e) => setTelefonoCliente(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
-                    <textarea required rows={2} placeholder="Dirección de Entrega *" value={direccionEntrega} onChange={(e) => setDireccionEntrega(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box', resize: 'none' }} />
+                    <div>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b' }}>Correo Electrónico *</label>
+                      <input 
+                        type="email" 
+                        placeholder="ejemplo@correo.com" 
+                        value={emailCliente} 
+                        onChange={(e) => {
+                          const val = e.target.value.toLowerCase().replace(/[^a-z0-9.@_+-]/g, '');
+                          setEmailCliente(val);
+                        }} 
+                        style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} 
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b' }}>Teléfono *</label>
+                      <input 
+                        type="tel" 
+                        placeholder="Ej: 7777-8888" 
+                        value={telefonoCliente} 
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9\s-]/g, '');
+                          setTelefonoCliente(val);
+                        }} 
+                        style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} 
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b' }}>Ubicación de Entrega</span>
+                      <select value={departamentoSel} onChange={(e) => { setDepartamentoSel(e.target.value); setMunicipioSel(''); }} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}>
+                        <option value="">-- Departamento --</option>
+                        {ubicaciones.map((ubi, index) => (
+                          <option key={index} value={ubi.departamento}>{ubi.departamento}</option>
+                        ))}
+                      </select>
+                      <select value={municipioSel} onChange={(e) => setMunicipioSel(e.target.value)} disabled={!departamentoSel} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: !departamentoSel ? '#f1f5f9' : '#fff' }}>
+                        <option value="">-- Municipio --</option>
+                        {municipiosDisponibles.map((mun, index) => (
+                          <option key={index} value={mun}>{mun}</option>
+                        ))}
+                      </select>
+                      <textarea rows={2} placeholder="Dirección exacta (Calle, # Casa, Colonia) *" value={detalleDireccion} onChange={(e) => setDetalleDireccion(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box', resize: 'none', fontSize: '0.85rem' }} />
+                    </div>
 
                     <button type="submit" disabled={enviando || carrito.length === 0} style={{ backgroundColor: enviando || carrito.length === 0 ? '#94a3b8' : '#16a34a', color: '#fff', border: 'none', padding: '12px', borderRadius: '6px', fontWeight: 'bold', cursor: enviando || carrito.length === 0 ? 'not-allowed' : 'pointer', marginTop: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                       <Send size={18} /> {enviando ? 'Procesando...' : 'Confirmar Pedido'}
@@ -337,9 +440,9 @@ export default function VistaClientePedido({
             </div>
           )}
 
-          {/* PASO 2: CONFIRMACIÓN */}
+          {/* --- SECCIÓN: PASO 2 (CONFIRMACIÓN) --- */}
           {paso === 2 && cotizacionCreada && (
-            <div style={{ maxWidth: '500px', margin: '20px auto', padding: '20px', backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
+             <div style={{ maxWidth: '500px', margin: '20px auto', padding: '20px', backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
               <CheckCircle size={50} color="#16a34a" style={{ margin: '0 auto 15px' }} />
               <h2 style={{ color: '#0f172a', marginTop: 0, fontSize: '1.3rem' }}>¡Pedido Registrado!</h2>
               <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Tu pedido <strong>{cotizacionCreada.numero_cotizacion}</strong> ha sido creado exitosamente.</p>
@@ -352,7 +455,7 @@ export default function VistaClientePedido({
             </div>
           )}
 
-          {/* PASO 3: PAGO */}
+          {/* --- SECCIÓN: PASO 3 (PAGO) --- */}
           {paso === 3 && (
             <div style={{ maxWidth: '500px', margin: '20px auto', padding: '16px', backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
               <h2 style={{ textAlign: 'center', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '1.2rem' }}>
@@ -361,7 +464,6 @@ export default function VistaClientePedido({
               <p style={{ textAlign: 'center', color: '#64748b', marginBottom: '20px', fontSize: '0.9rem' }}>
                 Total a pagar: <strong>${cotizacionCreada?.total?.toFixed(2) || totalPedido.toFixed(2)}</strong>
               </p>
-
               {!metodoPago ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <button onClick={() => setMetodoPago('TARJETA')} style={{ padding: '15px', border: '2px solid #e2e8f0', borderRadius: '8px', backgroundColor: '#fff', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -378,7 +480,6 @@ export default function VistaClientePedido({
                   <button onClick={() => setMetodoPago(null)} style={{ background: 'none', border: 'none', color: '#0284c7', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '15px', fontSize: '0.85rem' }}>
                     <ArrowLeft size={14} /> Volver
                   </button>
-
                   {metodoPago === 'TARJETA' && (
                     <div style={{ backgroundColor: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       {errorPago && <div style={{ backgroundColor: '#fef2f2', color: '#b91c1c', padding: '8px', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '10px', fontWeight: 'bold' }}>⚠️ {errorPago}</div>}
@@ -395,7 +496,6 @@ export default function VistaClientePedido({
                       </div>
                     </div>
                   )}
-
                   {metodoPago === 'TRANSFERENCIA' && (
                     <div style={{ backgroundColor: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', color: '#0f172a', fontSize: '0.9rem' }}>Deposita a cuenta:</p>
@@ -416,14 +516,13 @@ export default function VistaClientePedido({
         </>
       )}
 
-      {/* VISTA 2: MIS PEDIDOS RESPONSIVE */}
+      {/* --- SECCIÓN: VISTA MIS PEDIDOS --- */}
       {vista === 'MIS_PEDIDOS' && (
         <div style={{ maxWidth: '800px', margin: '20px auto', padding: '16px' }}>
           <h2 style={{ color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.3rem' }}>
             <Package size={24} color="#0284c7" /> Mis Pedidos
           </h2>
           <p style={{ color: '#64748b', marginBottom: '15px', fontSize: '0.9rem' }}>Historial de compras.</p>
-
           {misPedidos.length === 0 ? (
             <div style={{ backgroundColor: '#fff', padding: '30px', borderRadius: '8px', textAlign: 'center', color: '#94a3b8', border: '1px solid #e2e8f0' }}>No hay pedidos.</div>
           ) : (
@@ -433,10 +532,8 @@ export default function VistaClientePedido({
                 if (pedido.estado === 'PAGADO') badgeColor = { bg: '#dcfce7', text: '#15803d', label: 'Pagado' };
                 if (pedido.estado === 'APROBADO_DESPACHO') badgeColor = { bg: '#e0f2fe', text: '#0369a1', label: 'Despachado' };
                 if (pedido.estado === 'FACTURADO') badgeColor = { bg: '#f3e8ff', text: '#6b21a8', label: 'Facturado' };
-
                 const pasosEstado = ['PENDIENTE', 'PAGADO', 'APROBADO_DESPACHO', 'FACTURADO'];
                 const indiceActual = pasosEstado.indexOf(pedido.estado);
-
                 const fechaPedido = new Date(pedido.fecha_emision);
                 const fechaEstimada = new Date(fechaPedido);
                 fechaEstimada.setDate(fechaEstimada.getDate() + 2);
@@ -444,14 +541,11 @@ export default function VistaClientePedido({
 
                 return (
                   <div key={pedido.id_cotizacion} style={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                    
-                    {/* Header Tarjeta */}
                     <div style={{ backgroundColor: '#f8fafc', padding: '15px', borderBottom: '1px solid #e2e8f0', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '10px' }}>
                       <div>
                         <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 'bold', display: 'block', textTransform: 'uppercase' }}>N° de Pedido</span>
                         <strong style={{ color: '#0284c7', fontSize: '1rem' }}>{pedido.numero_cotizacion}</strong>
                         <span style={{ fontSize: '0.8rem', color: '#94a3b8', marginLeft: '8px' }}>{new Date(pedido.fecha_emision).toLocaleDateString()}</span>
-
                         <div style={{ marginTop: '8px', padding: '6px 10px', backgroundColor: '#eff6ff', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                           <Truck size={14} color="#0284c7" />
                           <span style={{ fontSize: '0.75rem', color: '#1e3a8a' }}><strong>Entrega:</strong> {fechaEntregaStr}</span>
@@ -467,11 +561,7 @@ export default function VistaClientePedido({
                         </span>
                       </div>
                     </div>
-
-                    {/* Contenido Tarjeta */}
                     <div style={{ padding: '15px' }}>
-                      
-                      {/* Barra de Progreso */}
                       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '15px', overflowX: 'auto', paddingBottom: '5px' }}>
                         {['Recibido', 'Pagado', 'Despachado', 'Facturado'].map((label, index) => {
                           const isActive = index <= indiceActual;
@@ -490,7 +580,6 @@ export default function VistaClientePedido({
                           );
                         })}
                       </div>
-
                       <h4 style={{ margin: '0 0 8px 0', fontSize: '0.8rem', color: '#475569', borderBottom: '1px solid #f1f5f9', paddingBottom: '5px' }}>Productos:</h4>
                       <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '0.8rem' }}>
                         {pedido.cotizacion_detalles?.map((item: any) => (
@@ -512,9 +601,9 @@ export default function VistaClientePedido({
   );
 }
 
-// ---------------------------------------------------------------------------
-// SUBCOMPONENTE: TARJETA PRODUCTO RESPONSIVE
-// ---------------------------------------------------------------------------
+// ============================================================================
+// 8. SUBCOMPONENTE: TARJETA PRODUCTO
+// ============================================================================
 function TarjetaProductoCliente({ producto, onAgregar }: { producto: ProductoEntity; onAgregar: (prod: ProductoEntity, cajas: number, unidades: number) => void; }) {
   const [cajas, setCajas] = useState(0);
   const [unidades, setUnidades] = useState(1);

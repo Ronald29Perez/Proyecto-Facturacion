@@ -97,6 +97,7 @@ const TABS_PERMITIDAS: Record<string, string[]> = {
   BODEGA:        ['LOTES', 'DESPACHO', 'RUTAS', 'REPORTES'],
   CAJERO:        ['FACTURACION', 'REPORTES'],
   VENDEDOR:      ['CATALOGO', 'LOTES', 'REPORTES'],
+  MOTORISTA:     ['RUTAS'],
   CLIENTE:       [],
 };
 
@@ -191,6 +192,7 @@ export default function ERPDashboardPage() {
   const handleLoginExitoso = async (usr: SesionUsuario) => {
     guardarSesion(usr);
     setUsuarioActivo(usr);
+    
     // Si es gerente o admin, que inicie en Dashboard
     setTabActiva(usr.rol === 'ADMINISTRADOR' || usr.rol === 'GERENTE' ? 'DASHBOARD' : 'CATALOGO');
     await cargarDatosServidor();
@@ -287,8 +289,9 @@ export default function ERPDashboardPage() {
   }
 
   // 5. Menú de Pestañas con Iconos
+
   const tabsVisibles = [
-    { key: 'DASHBOARD', label: 'Inicio', icon: <LayoutDashboard size={18} /> }, // 🔥 NUEVO
+    { key: 'DASHBOARD', label: 'Inicio', icon: <LayoutDashboard size={18} /> },
     { key: 'CATALOGO', label: 'Catálogo', icon: <ShoppingCart size={18} /> },
     { key: 'PRODUCTOS', label: 'Ficha de Producto', icon: <FileText size={18} /> },
     { key: 'LOTES', label: 'Entradas Bodega', icon: <Package size={18} /> },
@@ -300,120 +303,115 @@ export default function ERPDashboardPage() {
   ].filter(tab => TABS_PERMITIDAS[usuarioActivo.rol]?.includes(tab.key));
 
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', backgroundColor: '#f1f5f9', minHeight: '100vh', padding: '20px' }}>
+    <div className="min-h-screen bg-slate-100 font-sans flex flex-col">
       
-      {/* HEADER */}
-      <header style={{ backgroundColor: '#1e293b', color: '#ffffff', padding: '20px', borderRadius: '10px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <div style={{ width: '140px', height: '40px', position: 'relative' }}>
-            <Image src="/img/logo-agrolactec.png" alt="AgroLactec Logo" fill style={{ objectFit: 'contain', objectPosition: 'left' }} />
+      {/* HEADER COMPACTO Y HORIZONTAL */}
+      <header className="bg-slate-800 text-white shadow-md sticky top-0 z-50 flex flex-col">
+        {/* Fila 1: Logo, Usuario y Botones de Acción (Siempre en una línea) */}
+        <div className="px-3 py-2 flex items-center justify-between gap-2">
+          
+          <div className="flex items-center gap-2 overflow-hidden">
+            <div className="w-16 h-8 relative bg-white rounded p-0.5 shrink-0">
+              <Image src="/img/logo-agrolactec.png" alt="Logo" fill className="object-contain" priority />
+            </div>
+            <div className="min-w-0">
+              <h1 className="m-0 text-sm md:text-lg text-sky-400 font-bold leading-tight truncate">AgroLactec</h1>
+              <p className="m-0 text-[10px] md:text-xs text-slate-300 truncate">
+                {usuarioActivo.nombre_completo} ({usuarioActivo.rol})
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#38bdf8' }}>AgroLactec ERP</h1>
-            <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: '#94a3b8' }}>
-              Usuario: <strong>{usuarioActivo.nombre_completo}</strong> ({usuarioActivo.rol})
-            </p>
+
+          <div className="flex gap-2 shrink-0">
+            <button onClick={cargarDatosServidor} disabled={cargando} className="bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white p-2 rounded flex items-center justify-center transition-colors">
+              <RefreshCw size={16} className={cargando ? 'animate-spin' : ''} />
+            </button>
+            <button onClick={handleLogout} className="bg-red-500 hover:bg-red-600 text-white p-2 rounded flex items-center justify-center transition-colors">
+              <LogOut size={16} />
+            </button>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={cargarDatosServidor} disabled={cargando} style={{ backgroundColor: '#0284c7', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: cargando ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <RefreshCw size={16} /> Recargar Datos
-          </button>
-          <button onClick={handleLogout} style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <LogOut size={16} /> Cerrar Sesión
-          </button>
+        {/* Fila 2: Pestañas con scroll horizontal (No se apilan, se deslizan) */}
+        <div className="w-full overflow-x-auto border-t border-slate-700 bg-slate-800/50">
+          <nav className="flex gap-1 px-2 py-2 min-w-max">
+            {tabsVisibles.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setTabActiva(tab.key as TabActiva)}
+                className={`px-3 py-2 rounded-md font-bold text-xs md:text-sm flex items-center gap-2 transition-all whitespace-nowrap ${
+                  tabActiva === tab.key 
+                    ? 'bg-sky-600 text-white shadow-sm' 
+                    : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
+          </nav>
         </div>
       </header>
 
-      {/* NAVEGACIÓN */}
-      <nav style={{ display: 'flex', gap: '10px', marginBottom: '20px', backgroundColor: '#ffffff', padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto' }}>
-        {tabsVisibles.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setTabActiva(tab.key as TabActiva)}
-            style={{
-              padding: '10px 16px',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              fontSize: '0.85rem',
-              whiteSpace: 'nowrap',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              backgroundColor: tabActiva === tab.key ? '#2563eb' : 'transparent',
-              color: tabActiva === tab.key ? '#ffffff' : '#64748b',
-              transition: 'all 0.2s'
-            }}
-          >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
-      </nav>
+      {/* CONTENIDO PRINCIPAL */}
+      <main className="flex-1 w-full max-w-7xl mx-auto p-2 md:p-6 overflow-hidden">
+        <div className="bg-white rounded-lg md:rounded-xl shadow-sm border border-slate-200 p-2 md:p-6 min-h-[80vh]">
+          {!TABS_PERMITIDAS[usuarioActivo.rol]?.includes(tabActiva) ? (
+            <div className="text-center py-20 px-4 text-red-500">
+              <ShieldAlert size={64} className="mx-auto mb-4" />
+              <h2 className="text-2xl font-bold">Acceso Denegado</h2>
+              <p className="text-slate-500 mt-2">Tu rol ({usuarioActivo.rol}) no tiene permisos para ver este módulo.</p>
+            </div>
+          ) : (
+            <>
+              {tabActiva === 'DASHBOARD' && <DashboardAdmin datos={dashboardData} />}
 
-      {/* CONTENIDO */}
-      <main style={{ backgroundColor: '#ffffff', borderRadius: '10px', padding: '15px', border: '1px solid #cbd5e1' }}>
-        {!TABS_PERMITIDAS[usuarioActivo.rol]?.includes(tabActiva) ? (
-          <div style={{ textAlign: 'center', padding: '50px', color: '#ef4444' }}>
-            <ShieldAlert size={48} style={{ margin: '0 auto 16px' }} />
-            <h2>Acceso Denegado</h2>
-            <p>Tu rol ({usuarioActivo.rol}) no tiene permisos para ver este módulo.</p>
-          </div>
-        ) : (
-          <>
-            {/* 🔥 RENDERIZADO DEL DASHBOARD */}
-            {tabActiva === 'DASHBOARD' && (
-              <DashboardAdmin datos={dashboardData} />
-            )}
+              {tabActiva === 'CATALOGO' && (
+                <VistaClientePedido
+                  usuario={{
+                    id_usuario: usuarioActivo.id_usuario,
+                    nombre_completo: usuarioActivo.nombre_completo,
+                    username: usuarioActivo.username,
+                    password_hash: '',
+                    rol: usuarioActivo.rol,
+                    activo: usuarioActivo.activo,
+                  }}
+                  productos={productos}
+                  categorias={categorias}
+                  onCerrarSesion={() => {}} 
+                />
+              )}
 
-            {tabActiva === 'CATALOGO' && (
-              <VistaClientePedido
-                usuario={{
-                  id_usuario: usuarioActivo.id_usuario,
-                  nombre_completo: usuarioActivo.nombre_completo,
-                  username: usuarioActivo.username,
-                  password_hash: '',
-                  rol: usuarioActivo.rol,
-                  activo: usuarioActivo.activo,
-                }}
-                productos={productos}
-                categorias={categorias}
-                onCerrarSesion={() => {}} 
-              />
-            )}
+              {tabActiva === 'PRODUCTOS' && (
+                <RegistroProducto productos={productos} categorias={categorias} subcategorias={subcategorias} proveedores={proveedores} onRefrescarDatos={cargarDatosServidor} />
+              )}
 
-            {tabActiva === 'PRODUCTOS' && (
-              <RegistroProducto productos={productos} categorias={categorias} subcategorias={subcategorias} proveedores={proveedores} onRefrescarDatos={cargarDatosServidor} />
-            )}
+              {tabActiva === 'LOTES' && (
+                <GestionLotes productos={productos} lotes={lotes} onGuardarLote={handleGuardarLote} />
+              )}
 
-            {tabActiva === 'LOTES' && (
-              <GestionLotes productos={productos} lotes={lotes} onGuardarLote={handleGuardarLote} />
-            )}
+              {tabActiva === 'DESPACHO' && (
+                <OrdenDespacho cotizacionesPendientes={cotizacionesPendientes} onProcesarDespachoFIFO={handleProcesarDespachoFIFO} />
+              )}
 
-            {tabActiva === 'DESPACHO' && (
-              <OrdenDespacho cotizacionesPendientes={cotizacionesPendientes} onProcesarDespachoFIFO={handleProcesarDespachoFIFO} />
-            )}
+              {tabActiva === 'FACTURACION' && (
+                <ComprobanteFiscal ordenesPorFacturar={ordenesPorFacturar} cuentasBancarias={cuentasBancarias} onGenerarComprobante={handleGenerarComprobante} />
+              )}
 
-            {tabActiva === 'FACTURACION' && (
-              <ComprobanteFiscal ordenesPorFacturar={ordenesPorFacturar} cuentasBancarias={cuentasBancarias} onGenerarComprobante={handleGenerarComprobante} />
-            )}
+              {tabActiva === 'USUARIOS' && (
+                <GestionUsuarios usuarios={usuarios} onRefrescarUsuarios={cargarDatosServidor} />
+              )}
 
-            {tabActiva === 'USUARIOS' && (
-              <GestionUsuarios usuarios={usuarios} onRefrescarUsuarios={cargarDatosServidor} />
-            )}
+              {tabActiva === 'REPORTES' && (
+                <HistorialReportes cotizaciones={historialCotizaciones} despachos={historialDespachos} facturas={historialFacturas} inventario={inventario} valorTotalBodega={valorTotalBodega} totalCajas={totalCajas} rolUsuario={usuarioActivo.rol} onRefrescar={cargarDatosServidor} />
+              )}
 
-            {tabActiva === 'REPORTES' && (
-              <HistorialReportes cotizaciones={historialCotizaciones} despachos={historialDespachos} facturas={historialFacturas}  inventario={inventario}  valorTotalBodega={valorTotalBodega} totalCajas={totalCajas}  rolUsuario={usuarioActivo.rol}  onRefrescar={cargarDatosServidor}  />
-            )}
-
-            {tabActiva === 'RUTAS' && (
-              <MonitoreoRuta cotizaciones={historialCotizaciones} />
-            )}
-          </>
-        )}
+              {tabActiva === 'RUTAS' && (
+                <MonitoreoRuta cotizaciones={historialCotizaciones} />
+              )}
+            </>
+          )}
+        </div>
       </main>
     </div>
   );
