@@ -1,11 +1,10 @@
 /* Ubicación: app/globals.css */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@reference "tailwindcss";
 
 @layer base {
   :root {
-    --foreground-rgb: 15, 23, 42; /* slate-900 */
+    --foreground-rgb: 15, 23, 42;
     --background-start-rgb: 248, 250, 252;
     --background-end-rgb: 255, 255, 255;
   }
@@ -22,3 +21,33 @@
   }
 }
 
+/* --- Utilidades globales personalizadas --- */
+
+@utility contenedor-erp {
+  @apply w-full max-w-7xl mx-auto p-4;
+  
+  /* En v4, los estilos responsivos van fuera del @apply */
+  @media (min-width: 768px) {
+    padding: 1.5rem; /* Esto equivale a p-6 (24px) */
+  }
+}
+
+@utility tarjeta-erp {
+  @apply bg-white rounded-xl shadow-sm border border-slate-200 p-4;
+  
+  @media (min-width: 768px) {
+    padding: 1.5rem;
+  }
+}
+
+@utility tabla-erp {
+  @apply w-full text-sm text-left border-collapse;
+
+  & th {
+    @apply p-3 bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase text-xs;
+  }
+  
+  & td {
+    @apply p-3 border-b border-slate-100;
+  }
+}
