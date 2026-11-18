@@ -76,7 +76,7 @@ export default function GestionUsuarios({ usuarios, onRefrescarUsuarios }: Props
       {/* FORMULARIO (Ocupa 1/3 en PC) */}
       <div className="col-span-1 bg-white p-5 rounded-xl border border-slate-200 shadow-sm h-fit">
         <h3 className="mt-0 mb-4 text-lg font-bold text-slate-800 flex items-center gap-2">
-          👤 Registrar Nuevo Usuario
+           Registrar Nuevo Usuario
         </h3>
 
         <form onSubmit={handleCrearUsuario} className="flex flex-col gap-4">
@@ -138,7 +138,7 @@ export default function GestionUsuarios({ usuarios, onRefrescarUsuarios }: Props
               guardando ? 'bg-slate-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
             }`}
           >
-            {guardando ? 'Guardando...' : '💾 Guardar Usuario'}
+            {guardando ? 'Guardando...' : ' Guardar Usuario'}
           </button>
         </form>
       </div>
@@ -146,7 +146,7 @@ export default function GestionUsuarios({ usuarios, onRefrescarUsuarios }: Props
       {/* TABLA DE USUARIOS (Ocupa 2/3 en PC) */}
       <div className="col-span-1 lg:col-span-2 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
         <h3 className="mt-0 mb-4 text-lg font-bold text-slate-800 flex items-center gap-2">
-          👥 Usuarios en el Sistema
+          Usuarios en el Sistema
         </h3>
 
         <div className="overflow-x-auto border border-slate-200 rounded-lg">

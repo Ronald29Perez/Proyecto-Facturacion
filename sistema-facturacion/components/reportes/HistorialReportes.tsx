@@ -1,6 +1,5 @@
 // ============================================================================
 // COMPONENTE: REPORTES E HISTORIAL (RESPONSIVE)
-// Ubicación: components/reportes/HistorialReportes.tsx
 // ============================================================================
 
 'use client';
@@ -92,7 +91,7 @@ export default function HistorialReportes({
       {/* ENCABEZADO DEL REPORTE */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 pb-4 border-b border-slate-200">
         <div>
-          <h3 className="m-0 text-lg font-bold text-slate-800">📊 Reportes e Historial</h3>
+          <h3 className="m-0 text-lg font-bold text-slate-800">Reportes e Historial</h3>
           <p className="text-xs text-slate-500 mt-1">Fecha: {new Date().toLocaleString()}</p>
         </div>
         
@@ -114,16 +113,16 @@ export default function HistorialReportes({
       {/* PESTAÑAS CON SCROLL HORIZONTAL */}
       <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
         {puedeVerCotizaciones && (
-          <button onClick={() => setTab('COT')} className={btnTabClass(tab === 'COT')}>📄 Cotizaciones</button>
+          <button onClick={() => setTab('COT')} className={btnTabClass(tab === 'COT')}> Cotizaciones</button>
         )}
         {puedeVerDespachos && (
-          <button onClick={() => setTab('DES')} className={btnTabClass(tab === 'DES')}>📦 Despachos</button>
+          <button onClick={() => setTab('DES')} className={btnTabClass(tab === 'DES')}>Despachos</button>
         )}
         {puedeVerFacturas && (
-          <button onClick={() => setTab('FAC')} className={btnTabClass(tab === 'FAC')}>🧾 Facturas</button>
+          <button onClick={() => setTab('FAC')} className={btnTabClass(tab === 'FAC')}>Facturas</button>
         )}
         {puedeVerInventario && (
-          <button onClick={() => setTab('INV')} className={btnTabClass(tab === 'INV')}>📦 Inventario</button>
+          <button onClick={() => setTab('INV')} className={btnTabClass(tab === 'INV')}>Inventario</button>
         )}
       </div>
 
@@ -152,7 +151,7 @@ export default function HistorialReportes({
                   <td className="p-3 font-bold text-green-600">${Number(c.total).toFixed(2)}</td>
                   <td className="p-3"><BadgeEstado estado={c.estado} /></td>
                   <td className="p-3 text-center">
-                    <button onClick={() => abrirDetalle(c, 'COT')} className="bg-sky-100 text-sky-700 hover:bg-sky-200 px-3 py-1.5 rounded text-xs font-bold transition-colors">👁️ Ver</button>
+                    <button onClick={() => abrirDetalle(c, 'COT')} className="bg-sky-100 text-sky-700 hover:bg-sky-200 px-3 py-1.5 rounded text-xs font-bold transition-colors"> Ver</button>
                   </td>
                 </tr>
               ))}
@@ -184,7 +183,7 @@ export default function HistorialReportes({
                   <td className="p-3 font-bold">${Number(d.cotizaciones?.total || 0).toFixed(2)}</td>
                   <td className="p-3"><BadgeEstado estado={d.estado} /></td>
                   <td className="p-3 text-center">
-                    <button onClick={() => abrirDetalle(d, 'DES')} className="bg-sky-100 text-sky-700 hover:bg-sky-200 px-3 py-1.5 rounded text-xs font-bold transition-colors">👁️ Ver</button>
+                    <button onClick={() => abrirDetalle(d, 'DES')} className="bg-sky-100 text-sky-700 hover:bg-sky-200 px-3 py-1.5 rounded text-xs font-bold transition-colors"> Ver</button>
                   </td>
                 </tr>
               ))}
@@ -214,7 +213,7 @@ export default function HistorialReportes({
                   <td className="p-3 text-slate-500">{f.tipo_comprobante.replace(/_/g, ' ')}</td>
                   <td className="p-3 font-bold text-green-600">${Number(f.total).toFixed(2)}</td>
                   <td className="p-3 text-center">
-                    <button onClick={() => abrirDetalle(f, 'FAC')} className="bg-sky-100 text-sky-700 hover:bg-sky-200 px-3 py-1.5 rounded text-xs font-bold transition-colors">👁️ Ver</button>
+                    <button onClick={() => abrirDetalle(f, 'FAC')} className="bg-sky-100 text-sky-700 hover:bg-sky-200 px-3 py-1.5 rounded text-xs font-bold transition-colors"> Ver</button>
                   </td>
                 </tr>
               ))}
@@ -306,9 +305,9 @@ export default function HistorialReportes({
             
             <div className="flex justify-between items-center mb-4 border-b pb-3">
               <h3 className="m-0 text-lg font-bold text-slate-800">
-                {tipoModal === 'COT' && '📄 Detalle de Cotización'}
-                {tipoModal === 'DES' && '📦 Detalle de Despacho'}
-                {tipoModal === 'FAC' && '🧾 Detalle de Factura'}
+                {tipoModal === 'COT' && ' Detalle de Cotización'}
+                {tipoModal === 'DES' && ' Detalle de Despacho'}
+                {tipoModal === 'FAC' && ' Detalle de Factura'}
               </h3>
               <button onClick={cerrarModal} className="text-slate-400 hover:text-red-500 text-2xl font-bold leading-none">✕</button>
             </div>
@@ -354,7 +353,7 @@ export default function HistorialReportes({
                   <p><strong>Fecha:</strong> {new Date(detalleModal.fecha_despacho).toLocaleString()}</p>
                   <p><strong>Estado:</strong> {detalleModal.estado}</p>
                   
-                  <h4 className="mt-5 mb-2 font-bold text-slate-800 border-b pb-1">📋 Lotes Retirados (FIFO)</h4>
+                  <h4 className="mt-5 mb-2 font-bold text-slate-800 border-b pb-1"> Lotes Retirados (FIFO)</h4>
                   
                   {detalleModal.despacho_lotes_detalles && detalleModal.despacho_lotes_detalles.length > 0 ? (
                     <div className="overflow-x-auto">
