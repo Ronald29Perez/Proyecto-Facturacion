@@ -96,7 +96,7 @@ Las contribuciones al proyecto son bienvenidas. Para proponer mejoras o corregir
 
 ## Autor
 
-* **Ronald Pérez** - Perfil de GitHub: [Ronald29Perez](https://github.com/Ronald29Perez)
+* **Ronald Pérez**
 
 ## Licencia
 
