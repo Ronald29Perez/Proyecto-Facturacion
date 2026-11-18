@@ -94,7 +94,7 @@ export default function ImportExportProductos({ onImportComplete }: Props) {
       <div className="flex items-start justify-between mb-4">
         <div>
           <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-            📥 Carga y Exportación Masiva en Excel / CSV
+            Carga y Exportación Masiva en Excel / CSV
           </h2>
           <p className="text-sm text-gray-500 mt-1">
             Descarga el catálogo actual o sube una hoja de cálculo CSV con nuevos registros.
@@ -108,12 +108,12 @@ export default function ImportExportProductos({ onImportComplete }: Props) {
             disabled={cargando}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
           >
-            📤 Exportar Catálogo (.CSV)
+           Exportar Catálogo (.CSV)
           </button>
 
           {/* IMPORTAR (input file oculto) */}
           <label className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 cursor-pointer disabled:opacity-50">
-            📥 Importar CSV
+            Importar CSV
             <input
               type="file"
               accept=".csv"
@@ -141,13 +141,13 @@ export default function ImportExportProductos({ onImportComplete }: Props) {
       {/* INDICADOR DE CARGA */}
       {cargando && (
         <div className="mt-4 text-sm text-gray-500 flex items-center gap-2">
-          ⏳ Procesando...
+           Procesando...
         </div>
       )}
 
       {/* AYUDA: FORMATO ESPERADO */}
       <details className="mt-4 text-xs text-gray-500">
-        <summary className="cursor-pointer font-medium">📋 Ver formato esperado del CSV</summary>
+        <summary className="cursor-pointer font-medium">Ver formato esperado del CSV</summary>
         <pre className="mt-2 bg-gray-50 p-3 rounded overflow-x-auto">
       {`item_code,nombre,categoria,subcategoria,proveedor,nso,precio_b2c,precio_b2b,unidades_por_caja,unidad_medida
       CR-201,Quesillo Super Suave 16 oz,Quesos,Queso de Hilo / Quesillo,Quesos El Rancho,NSO-001,2.50,54.00,24,CAJA

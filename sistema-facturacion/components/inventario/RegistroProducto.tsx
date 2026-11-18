@@ -1,6 +1,5 @@
 // ============================================================================
-// COMPONENTE: GESTIÓN DE CATÁLOGO Y FICHA DE PRODUCTOS (RESPONSIVE)
-// Ubicación: components/inventario/RegistroProducto.tsx
+// COMPONENTE: GESTIÓN DE CATÁLOGO Y FICHA DE PRODUCTOS
 // ============================================================================
 
 'use client';
@@ -79,7 +78,7 @@ export default function RegistroProducto({
     if (archivoImagen) {
       const urlSubida = await subirImagenProducto(archivoImagen, productoEditar.item_code);
       if (urlSubida) urlFinal = urlSubida;
-      else alert('⚠️ La imagen no se pudo subir, pero el producto se guardará sin foto.');
+      else alert(' La imagen no se pudo subir, pero el producto se guardará sin foto.');
     }
 
     const res = await guardarOActualizarProducto({ ...productoEditar, imagen_url: urlFinal });
@@ -117,7 +116,7 @@ export default function RegistroProducto({
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 my-6">
         <div>
-          <h3 className="m-0 text-slate-900 text-lg font-bold">📝 Administración de Catálogo</h3>
+          <h3 className="m-0 text-slate-900 text-lg font-bold">Administración de Catálogo</h3>
           <p className="m-0 mt-1 text-sm text-slate-500">Gestiona precios, modifica fichas técnicas o cambia el estado.</p>
         </div>
         <button
@@ -125,14 +124,14 @@ export default function RegistroProducto({
           onClick={() => handleAbrirModal()}
           className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-5 rounded-md flex justify-center items-center gap-2 transition-colors"
         >
-          ➕ Nuevo Producto
+          Nuevo Producto
         </button>
       </div>
 
       <div className="mb-4">
         <input
           type="text"
-          placeholder="🔍 Buscar producto por código o nombre..."
+          placeholder="Buscar producto por código o nombre..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           className="w-full px-4 py-2.5 rounded-md border border-slate-300 text-sm focus:outline-none focus:border-sky-500"
@@ -190,7 +189,7 @@ export default function RegistroProducto({
                       <div className="flex gap-2 justify-center">
                         <button onClick={() => handleAbrirModal(p)} className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors">✏️ Modificar</button>
                         <button onClick={() => p.id_producto && handleToggleEstado(p.id_producto, esActivo)} disabled={!p.id_producto} className={`px-3 py-1.5 rounded text-xs font-bold text-white transition-colors ${esActivo ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}>
-                          {esActivo ? '🚫 Descontinuar' : '🔄 Reactivar'}
+                          {esActivo ? ' Descontinuar' : ' Reactivar'}
                         </button>
                       </div>
                     </td>
@@ -207,7 +206,7 @@ export default function RegistroProducto({
         <div className="fixed inset-0 bg-slate-900/60 flex justify-center items-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl p-5 md:p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl">
             <h3 className="mt-0 text-slate-900 text-xl font-bold border-b pb-3 mb-5">
-              {productoEditar.id_producto ? '✏️ Modificar Producto' : '➕ Registrar Nuevo Producto'}
+              {productoEditar.id_producto ? ' Modificar Producto' : ' Registrar Nuevo Producto'}
             </h3>
 
             <form onSubmit={handleGuardar} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -306,7 +305,7 @@ export default function RegistroProducto({
               <div className="md:col-span-2 flex flex-col sm:flex-row justify-end gap-3 mt-4 border-t pt-4">
                 <button type="button" onClick={() => setMostrarModal(false)} className="w-full sm:w-auto px-6 py-2.5 bg-slate-500 hover:bg-slate-600 text-white rounded-md font-bold transition-colors">Cancelar</button>
                 <button type="submit" disabled={guardando} className="w-full sm:w-auto px-6 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-slate-400 text-white rounded-md font-bold transition-colors">
-                  {guardando ? 'Guardando...' : '💾 Guardar Producto'}
+                  {guardando ? 'Guardando...' : ' Guardar Producto'}
                 </button>
               </div>
             </form>
